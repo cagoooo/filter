@@ -60,7 +60,7 @@ export default function FilterPage({
 
   const handleRun = () => {
     setFilterConfigs(configs);
-    runFilter();
+    runFilter(configs);
     onNext();
   };
 

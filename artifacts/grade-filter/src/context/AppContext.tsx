@@ -16,7 +16,7 @@ interface AppContextType {
   setCurrentStudents: (data: Student[]) => void;
   setSpecialStudents: (ids: string[]) => void;
   setFilterConfigs: (configs: FilterConfig[]) => void;
-  runFilter: () => void;
+  runFilter: (configs?: FilterConfig[]) => void;
   clearResults: () => void;
 }
 
@@ -37,15 +37,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return mathData;
   }
 
-  function runFilter() {
+  function runFilter(configs?: FilterConfig[]) {
+    const activeConfigs = configs ?? filterConfigs;
     const allResults: FilterResult[] = [];
     const specialIdSet = new Set(specialStudents.map((id) => id.trim()));
     const currentIdSet = new Set(currentStudents.map((s) => s.idNumber.trim()));
 
-    for (const config of filterConfigs) {
+    const allDataBySubject: Record<Subject, Student[]> = {
+      chinese: chineseData,
+      english: englishData,
+      math: mathData,
+    };
+
+    for (const config of activeConfigs) {
       const data = getSubjectData(config.subject);
       const gradeData = data.filter((s) => s.grade === config.grade);
 
+      const specialInGrade = gradeData.filter((s) =>
+        specialIdSet.has(s.idNumber.trim())
+      );
       const nonSpecial = gradeData.filter(
         (s) => !specialIdSet.has(s.idNumber.trim())
       );
@@ -73,13 +83,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
           !selectedIdSet.has(s.idNumber.trim())
       );
 
+      const enrichScores = (s: Student): Partial<Record<Subject, number>> => {
+        const scores: Partial<Record<Subject, number>> = {};
+        for (const subj of ["chinese", "english", "math"] as Subject[]) {
+          const subjectData = allDataBySubject[subj];
+          const match = subjectData.find(
+            (d) => d.idNumber.trim() === s.idNumber.trim()
+          );
+          if (match && match[subj] !== undefined) {
+            scores[subj] = match[subj] as number;
+          }
+        }
+        return scores;
+      };
+
       for (const s of selected) {
         const score = s[config.subject] ?? 0;
         const isPriority = currentIdSet.has(s.idNumber.trim());
-        if (!allResults.find((r) => r.id === `${s.id}-${config.subject}`)) {
+        const rowId = `${s.idNumber.trim()}-${config.subject}`;
+        if (!allResults.find((r) => r.id === rowId)) {
           allResults.push({
             ...s,
-            id: `${s.id}-${config.subject}`,
+            ...enrichScores(s),
+            id: rowId,
             status: isPriority ? "priority" : "normal",
             filterSubject: config.subject,
             filterScore: score,
@@ -89,11 +115,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       for (const s of priorityStudents) {
         const score = s[config.subject] ?? 0;
-        if (!allResults.find((r) => r.id === `${s.id}-${config.subject}`)) {
+        const rowId = `${s.idNumber.trim()}-${config.subject}`;
+        if (!allResults.find((r) => r.id === rowId)) {
           allResults.push({
             ...s,
-            id: `${s.id}-${config.subject}`,
+            ...enrichScores(s),
+            id: rowId,
             status: "priority",
+            filterSubject: config.subject,
+            filterScore: score,
+          });
+        }
+      }
+
+      for (const s of specialInGrade) {
+        const score = s[config.subject] ?? 0;
+        const rowId = `excluded-${s.idNumber.trim()}-${config.subject}`;
+        if (!allResults.find((r) => r.id === rowId)) {
+          allResults.push({
+            ...s,
+            ...enrichScores(s),
+            id: rowId,
+            status: "excluded",
             filterSubject: config.subject,
             filterScore: score,
           });

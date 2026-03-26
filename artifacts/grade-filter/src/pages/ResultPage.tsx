@@ -4,7 +4,6 @@ import { FilterResult, Subject, SUBJECT_LABELS, GRADE_LABELS } from "../types";
 import { exportToExcel, exportToCsv } from "../lib/excel";
 import {
   ArrowLeft,
-  Download,
   FileSpreadsheet,
   FileText,
   Star,
@@ -13,6 +12,7 @@ import {
   ChevronDown,
   Search,
   RefreshCw,
+  UserX,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -26,6 +26,7 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [gradeFilter, setGradeFilter] = useState<number | "all">("all");
   const [subjectFilter, setSubjectFilter] = useState<Subject | "all">("all");
+  const [showExcluded, setShowExcluded] = useState(true);
 
   const grades = useMemo(
     () =>
@@ -40,7 +41,9 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
   );
 
   const filtered = useMemo(() => {
-    let data = filterResults.filter((r) => r.status !== "excluded");
+    let data = filterResults.filter(
+      (r) => r.status !== "excluded" || showExcluded
+    );
 
     if (gradeFilter !== "all") {
       data = data.filter((r) => r.grade === gradeFilter);
@@ -72,7 +75,7 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
     }
 
     return data;
-  }, [filterResults, gradeFilter, subjectFilter, search, sortKey, sortDir]);
+  }, [filterResults, gradeFilter, subjectFilter, search, sortKey, sortDir, showExcluded]);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -93,43 +96,51 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
     );
   };
 
-  const exportData = () =>
-    filtered.map((r) => ({
+  const exportData = (includeExcluded = false) => {
+    const rows = filterResults.filter(
+      (r) => r.status !== "excluded" || includeExcluded
+    );
+    return rows.map((r) => ({
+      狀態: r.status === "priority" ? "優先" : r.status === "excluded" ? "已排除（特生）" : "一般",
       姓名: r.name,
       年級: GRADE_LABELS[r.grade] || r.grade,
       班級: r.class,
       座號: r.seatNo,
       身分證字號: r.idNumber,
-      科目: SUBJECT_LABELS[r.filterSubject],
-      成績: r.filterScore,
-      狀態: r.status === "priority" ? "優先" : "一般",
+      國文成績: r.chinese ?? "",
+      英文成績: r.english ?? "",
+      數學成績: r.math ?? "",
+      篩選科目: SUBJECT_LABELS[r.filterSubject],
+      篩選成績: r.filterScore,
     }));
+  };
 
   const priorityCount = filterResults.filter((r) => r.status === "priority").length;
   const normalCount = filterResults.filter((r) => r.status === "normal").length;
+  const excludedCount = filterResults.filter((r) => r.status === "excluded").length;
 
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-          <p className="text-xs text-gray-500 font-medium">總計人次</p>
+          <p className="text-xs text-gray-500 font-medium">篩選名單人次</p>
           <p className="text-2xl font-bold text-gray-900 mt-1">
-            {filterResults.filter(r => r.status !== "excluded").length}
+            {priorityCount + normalCount}
           </p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+        <div className="bg-white rounded-xl border border-amber-200 p-4 shadow-sm bg-amber-50/40">
           <p className="text-xs text-amber-600 font-medium">優先（在校生）</p>
           <p className="text-2xl font-bold text-amber-600 mt-1">
             {priorityCount}
           </p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+        <div className="bg-white rounded-xl border border-blue-200 p-4 shadow-sm bg-blue-50/30">
           <p className="text-xs text-blue-600 font-medium">一般篩選</p>
           <p className="text-2xl font-bold text-blue-600 mt-1">{normalCount}</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-          <p className="text-xs text-gray-500 font-medium">目前顯示</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{filtered.length}</p>
+        <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm opacity-70">
+          <p className="text-xs text-gray-500 font-medium">特生（已排除）</p>
+          <p className="text-2xl font-bold text-gray-500 mt-1">{excludedCount}</p>
         </div>
       </div>
 
@@ -145,7 +156,7 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 flex-wrap items-center">
             <select
               className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={gradeFilter}
@@ -177,14 +188,26 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
               ))}
             </select>
             <button
-              onClick={() => exportToExcel(exportData(), "篩選結果.xlsx")}
+              onClick={() => setShowExcluded((v) => !v)}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg border transition-colors",
+                showExcluded
+                  ? "border-gray-300 text-gray-600 bg-white hover:bg-gray-50"
+                  : "border-gray-200 text-gray-400 bg-gray-50"
+              )}
+            >
+              <UserX className="w-4 h-4" />
+              {showExcluded ? "隱藏特生" : "顯示特生"}
+            </button>
+            <button
+              onClick={() => exportToExcel(exportData(true), "篩選結果.xlsx")}
               className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
             >
               <FileSpreadsheet className="w-4 h-4" />
               Excel
             </button>
             <button
-              onClick={() => exportToCsv(exportData(), "篩選結果.csv")}
+              onClick={() => exportToCsv(exportData(true), "篩選結果.csv")}
               className="flex items-center gap-1.5 px-3 py-2 bg-gray-600 text-white text-sm font-medium rounded-lg hover:bg-gray-700 transition-colors"
             >
               <FileText className="w-4 h-4" />
@@ -204,8 +227,10 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
                   { key: "class", label: "班級" },
                   { key: "seatNo", label: "座號" },
                   { key: "idNumber", label: "身分證字號" },
-                  { key: "filterSubject", label: "科目" },
-                  { key: "filterScore", label: "成績" },
+                  { key: "chinese", label: "國文" },
+                  { key: "english", label: "英文" },
+                  { key: "math", label: "數學" },
+                  { key: "filterSubject", label: "篩選科目" },
                 ].map(({ key, label }) => (
                   <th
                     key={key}
@@ -224,7 +249,7 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
               {filtered.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={10}
                     className="px-4 py-12 text-center text-gray-400"
                   >
                     <Users className="w-10 h-10 mx-auto mb-2 opacity-30" />
@@ -236,8 +261,12 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
                   <tr
                     key={r.id}
                     className={cn(
-                      "border-b border-gray-50 hover:bg-gray-50/50 transition-colors",
-                      r.status === "priority" && "bg-amber-50/40"
+                      "border-b border-gray-50 transition-colors",
+                      r.status === "excluded"
+                        ? "bg-gray-50/80 opacity-60"
+                        : r.status === "priority"
+                        ? "bg-amber-50/40 hover:bg-amber-50/60"
+                        : "hover:bg-gray-50/50"
                     )}
                   >
                     <td className="px-4 py-3">
@@ -246,36 +275,52 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
                           <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
                           優先
                         </span>
+                      ) : r.status === "excluded" ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-gray-500 bg-gray-100 rounded-full px-2.5 py-1">
+                          <UserX className="w-3 h-3" />
+                          已排除
+                        </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 bg-blue-50 rounded-full px-2.5 py-1">
                           一般
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3 font-medium text-gray-900">
+                    <td className={cn("px-4 py-3 font-medium", r.status === "excluded" ? "text-gray-400" : "text-gray-900")}>
                       {r.name}
                     </td>
-                    <td className="px-4 py-3 text-gray-600">
+                    <td className="px-4 py-3 text-gray-500 text-xs">
                       {GRADE_LABELS[r.grade] || `${r.grade}年級`}
                     </td>
-                    <td className="px-4 py-3 text-gray-600">{r.class}</td>
-                    <td className="px-4 py-3 text-gray-600">{r.seatNo}</td>
-                    <td className="px-4 py-3 font-mono text-gray-700">
+                    <td className="px-4 py-3 text-gray-500 text-xs">{r.class}</td>
+                    <td className="px-4 py-3 text-gray-500 text-xs">{r.seatNo}</td>
+                    <td className={cn("px-4 py-3 font-mono text-xs", r.status === "excluded" ? "text-gray-400" : "text-gray-700")}>
                       {r.idNumber}
                     </td>
+                    <td className="px-4 py-3 text-center">
+                      <ScoreCell value={r.chinese} isFilter={r.filterSubject === "chinese"} isExcluded={r.status === "excluded"} />
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <ScoreCell value={r.english} isFilter={r.filterSubject === "english"} isExcluded={r.status === "excluded"} />
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <ScoreCell value={r.math} isFilter={r.filterSubject === "math"} isExcluded={r.status === "excluded"} />
+                    </td>
                     <td className="px-4 py-3">
-                      <span className="text-xs font-medium text-gray-700 bg-gray-100 rounded-full px-2.5 py-1">
+                      <span className="text-xs font-medium text-gray-600 bg-gray-100 rounded-full px-2.5 py-1">
                         {SUBJECT_LABELS[r.filterSubject]}
                       </span>
-                    </td>
-                    <td className="px-4 py-3 font-semibold text-gray-900">
-                      {r.filterScore}
                     </td>
                   </tr>
                 ))
               )}
             </tbody>
           </table>
+        </div>
+
+        <div className="px-5 py-3 border-t border-gray-100 text-xs text-gray-500 bg-gray-50/30">
+          顯示 {filtered.length} 筆
+          {excludedCount > 0 && !showExcluded && `（另有 ${excludedCount} 名特生已隱藏）`}
         </div>
       </div>
 
@@ -296,5 +341,19 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
         </button>
       </div>
     </div>
+  );
+}
+
+function ScoreCell({ value, isFilter, isExcluded }: { value?: number; isFilter: boolean; isExcluded: boolean }) {
+  if (value === undefined || value === null) {
+    return <span className="text-gray-300 text-xs">—</span>;
+  }
+  return (
+    <span className={cn(
+      "text-sm font-semibold",
+      isExcluded ? "text-gray-400" : isFilter ? "text-blue-700" : "text-gray-700"
+    )}>
+      {value}
+    </span>
   );
 }
