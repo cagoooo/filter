@@ -67,29 +67,40 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
     }
   };
 
-  const handleListUpload = async (
-    file: File,
-    setState: (s: FileState) => void,
-    setData: (ids: string[]) => void,
-    isCurrentList: boolean
-  ) => {
-    setState({ status: "loading", warnings: [], count: 0 });
+  const handleCurrentListUpload = async (file: File) => {
+    setCurrentState({ status: "loading", warnings: [], count: 0 });
     try {
       const result = await parseListFile(file);
-      if (isCurrentList) {
-        setCurrentStudents(result.students);
-        setData([]);
-      } else {
-        setData(result.students.map((s) => s.idNumber));
-      }
-      setState({
+      setCurrentStudents(result.students);
+      setCurrentState({
         status: "success",
         fileName: file.name,
         warnings: result.warnings,
         count: result.students.length,
       });
     } catch (err: unknown) {
-      setState({
+      setCurrentState({
+        status: "error",
+        errorMessage: err instanceof Error ? err.message : "解析失敗",
+        warnings: [],
+        count: 0,
+      });
+    }
+  };
+
+  const handleSpecialListUpload = async (file: File) => {
+    setSpecialState({ status: "loading", warnings: [], count: 0 });
+    try {
+      const result = await parseListFile(file);
+      setSpecialStudents(result.students);
+      setSpecialState({
+        status: "success",
+        fileName: file.name,
+        warnings: result.warnings,
+        count: result.students.length,
+      });
+    } catch (err: unknown) {
+      setSpecialState({
         status: "error",
         errorMessage: err instanceof Error ? err.message : "解析失敗",
         warnings: [],
@@ -205,14 +216,7 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
           <FileUploadCard
             title="在校生名單（當然優先）"
             description="目前正在班上課的學生，篩選後自動加入並標示「優先」"
-            onFileSelect={(file) =>
-              handleListUpload(
-                file,
-                setCurrentState,
-                () => {},
-                true
-              )
-            }
+            onFileSelect={handleCurrentListUpload}
             status={currentState.status}
             fileName={currentState.fileName}
             errorMessage={currentState.errorMessage}
@@ -224,15 +228,8 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
           />
           <FileUploadCard
             title="特生名單（排除施測）"
-            description="特殊生不參與篩選，依身分證字號比對排除"
-            onFileSelect={(file) =>
-              handleListUpload(
-                file,
-                setSpecialState,
-                (ids) => setSpecialStudents(ids as string[]),
-                false
-              )
-            }
+            description="特殊生不參與篩選，依身分證字號比對排除，結果中仍可見"
+            onFileSelect={handleSpecialListUpload}
             status={specialState.status}
             fileName={specialState.fileName}
             errorMessage={specialState.errorMessage}
