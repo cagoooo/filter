@@ -53,13 +53,31 @@ function isGradeOnly(val: string): boolean {
   return !isNaN(n) && n >= 1 && n <= 6 && String(n) === val.trim();
 }
 
-interface ColRates {
-  id: number;
-  classCode: number;
-  grade: number;
-  name: number;
-  score: number;
-  seat: number;
+function parseGradeFromClassCode(val: string): { grade: number; className: string } {
+  const trimmed = val.trim();
+  if (CLASS_CODE_RE.test(trimmed)) {
+    const grade = parseInt(trimmed[0], 10);
+    return { grade, className: trimmed };
+  }
+  const n = parseInt(trimmed, 10);
+  if (!isNaN(n) && n >= 1 && n <= 6) {
+    return { grade: n, className: trimmed };
+  }
+  return { grade: 0, className: trimmed };
+}
+
+function pickSheetForSubject(workbook: XLSX.WorkBook, subject: Subject): XLSX.WorkSheet {
+  const subjectKeywords: Record<Subject, string[]> = {
+    chinese: ["國文", "中文", "chinese"],
+    english: ["英文", "english"],
+    math: ["數學", "math", "數"],
+  };
+  const keywords = subjectKeywords[subject];
+  const matchedName = workbook.SheetNames.find((name) =>
+    keywords.some((k) => name.toLowerCase().includes(k.toLowerCase()))
+  );
+  const sheetName = matchedName ?? workbook.SheetNames[0];
+  return workbook.Sheets[sheetName];
 }
 
 function findMainTableWidth(dataRows: string[][]): number {
@@ -81,6 +99,15 @@ function findMainTableWidth(dataRows: string[][]): number {
     }
   }
   return mainWidth;
+}
+
+interface ColRates {
+  id: number;
+  classCode: number;
+  grade: number;
+  name: number;
+  score: number;
+  seat: number;
 }
 
 function detectColumnsByContent(dataRows: string[][]): {
@@ -142,29 +169,31 @@ function detectColumnsByContent(dataRows: string[][]): {
     gradeFromClass = true;
   }
 
-  return {
-    idxName,
-    idxGrade,
-    idxClass: idxClassCode,
-    idxSeat,
-    idxId,
-    idxScore,
-    gradeFromClass,
-  };
+  return { idxName, idxGrade, idxClass: idxClassCode, idxSeat, idxId, idxScore, gradeFromClass };
 }
 
-function parseGradeFromClassCode(val: string): { grade: number; className: string } {
-  const trimmed = val.trim();
-  if (CLASS_CODE_RE.test(trimmed)) {
-    const grade = parseInt(trimmed[0], 10);
-    const cls = trimmed.slice(1).replace(/^0+/, "") || trimmed.slice(1);
-    return { grade, className: trimmed };
+function detectIdColumnByContent(dataRows: string[][], dataStartRow: number, exclude: number[]): number {
+  const sample = dataRows.slice(dataStartRow, dataStartRow + Math.min(20, dataRows.length - dataStartRow));
+  const numCols = Math.max(...sample.map((r) => r.length));
+  let best = -1;
+  let bestRate = 0.3;
+  for (let c = 0; c < numCols; c++) {
+    if (exclude.includes(c)) continue;
+    const vals = sample.map((r) => String(r[c] ?? "").trim()).filter(Boolean);
+    const rate = vals.filter(isTaiwanId).length / (vals.length || 1);
+    if (rate > bestRate) {
+      bestRate = rate;
+      best = c;
+    }
   }
-  const n = parseInt(trimmed, 10);
-  if (!isNaN(n) && n >= 1 && n <= 6) {
-    return { grade: n, className: trimmed };
-  }
-  return { grade: 0, className: trimmed };
+  return best;
+}
+
+function classColHasClassCodes(dataRows: string[][], dataStartRow: number, idxClass: number): boolean {
+  const sample = dataRows.slice(dataStartRow, dataStartRow + Math.min(10, dataRows.length - dataStartRow));
+  const vals = sample.map((r) => String(r[idxClass] ?? "").trim()).filter(Boolean);
+  if (vals.length === 0) return false;
+  return vals.filter(isClassCode).length / vals.length >= 0.5;
 }
 
 function firstRowLooksLikeHeaders(row: string[]): boolean {
@@ -179,9 +208,8 @@ function firstRowLooksLikeHeaders(row: string[]): boolean {
   ];
 
   const leadingCols = row.slice(0, Math.min(6, row.length)).map((c) => String(c).trim());
-
   const leadingDataCount = leadingCols.filter(
-    (c) => isClassCode(c) || isTaiwanId(c) || isScore(c) || isSmallInt(c)
+    (c) => isClassCode(c) || isTaiwanId(c) || (isScore(c) && isScore(c) && parseFloat(c) > 6)
   ).length;
   if (leadingDataCount >= 2) return false;
 
@@ -190,6 +218,57 @@ function firstRowLooksLikeHeaders(row: string[]): boolean {
     knownKeywords.some((k) => c.includes(k))
   ).length;
   return matchCount >= 2;
+}
+
+function resolveColumns(
+  rawHeaders: string[],
+  dataRows: string[][],
+  dataStartRow: number,
+  scoreCandidates: string[]
+): {
+  idxName: number;
+  idxGrade: number;
+  idxClass: number;
+  idxSeat: number;
+  idxId: number;
+  idxScore: number;
+  gradeFromClass: boolean;
+  warnings: string[];
+} {
+  const warnings: string[] = [];
+  let idxName = findColumn(rawHeaders, ["姓名", "name"]);
+  let idxGrade = findColumn(rawHeaders, ["年級", "grade"]);
+  const idxClass = findColumn(rawHeaders, ["班級", "class", "班"]);
+  const idxSeat = findColumn(rawHeaders, ["座號", "seat", "號碼"]);
+  let idxId = findColumn(rawHeaders, [
+    "身分證字號", "身份證字號", "身分證", "身份證", "證照號碼", "id", "idnumber",
+  ]);
+  let idxScore = findColumn(rawHeaders, scoreCandidates);
+
+  if (idxScore === -1) {
+    idxScore = findColumn(rawHeaders, ["分數", "成績", "score"]);
+  }
+
+  let gradeFromClass = false;
+  if (idxGrade === -1 && idxClass !== -1) {
+    if (classColHasClassCodes(dataRows, dataStartRow, idxClass)) {
+      idxGrade = idxClass;
+      gradeFromClass = true;
+    }
+  }
+
+  if (idxId === -1) {
+    const exclude = [idxName, idxGrade, idxClass, idxSeat, idxScore].filter((x) => x !== -1);
+    idxId = detectIdColumnByContent(dataRows, dataStartRow, exclude);
+  }
+
+  if (idxName === -1) warnings.push("找不到「姓名」欄位");
+  if (idxId === -1) warnings.push("找不到「身分證字號」欄位");
+  if (!gradeFromClass && idxGrade === -1) warnings.push("找不到「年級」欄位");
+  if (idxScore === -1) warnings.push("找不到成績欄位");
+  if (gradeFromClass) warnings.push("年級已從班級代碼自動辨識（例：203 → 2年級3班）");
+
+  return { idxName, idxGrade, idxClass, idxSeat, idxId, idxScore, gradeFromClass, warnings };
 }
 
 export interface ParseResult {
@@ -207,7 +286,7 @@ export function parseScoreFile(
       try {
         const data = new Uint8Array(e.target!.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: "array" });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const sheet = pickSheetForSubject(workbook, subject);
         const rows: string[][] = XLSX.utils.sheet_to_json(sheet, {
           header: 1,
           defval: "",
@@ -238,19 +317,15 @@ export function parseScoreFile(
         if (firstRowLooksLikeHeaders(rows[0])) {
           dataStartRow = 1;
           const rawHeaders = rows[0].map(String);
-          idxName = findColumn(rawHeaders, ["姓名", "name"]);
-          idxGrade = findColumn(rawHeaders, ["年級", "grade"]);
-          idxClass = findColumn(rawHeaders, ["班級", "class", "班"]);
-          idxSeat = findColumn(rawHeaders, ["座號", "seat", "號碼"]);
-          idxId = findColumn(rawHeaders, [
-            "身分證字號", "身份證字號", "身分證", "身份證", "證照號碼", "id", "idnumber",
-          ]);
-          idxScore = findColumn(rawHeaders, scoreColumnCandidates[subject]);
-
-          if (idxName === -1) warnings.push("找不到「姓名」欄位");
-          if (idxId === -1) warnings.push("找不到「身分證字號」欄位");
-          if (idxGrade === -1) warnings.push("找不到「年級」欄位");
-          if (idxScore === -1) warnings.push("找不到成績欄位");
+          const resolved = resolveColumns(rawHeaders, rows, dataStartRow, scoreColumnCandidates[subject]);
+          idxName = resolved.idxName;
+          idxGrade = resolved.idxGrade;
+          idxClass = resolved.idxClass;
+          idxSeat = resolved.idxSeat;
+          idxId = resolved.idxId;
+          idxScore = resolved.idxScore;
+          gradeFromClass = resolved.gradeFromClass;
+          warnings.push(...resolved.warnings);
         } else {
           dataStartRow = 0;
           const detected = detectColumnsByContent(rows);
@@ -303,7 +378,7 @@ export function parseScoreFile(
 
           if (!name && !idNumber) continue;
 
-          const student: Student = {
+          students.push({
             id: generateId(name, idNumber, i),
             studentId: seatNo || String(i),
             name,
@@ -312,9 +387,7 @@ export function parseScoreFile(
             seatNo,
             idNumber,
             [subject]: score !== undefined && !isNaN(score) ? score : undefined,
-          };
-
-          students.push(student);
+          });
         }
 
         resolve({ students, warnings });
@@ -358,15 +431,36 @@ export function parseListFile(file: File): Promise<ParseResult> {
         if (firstRowLooksLikeHeaders(rows[0])) {
           dataStartRow = 1;
           const rawHeaders = rows[0].map(String);
-          idxName = findColumn(rawHeaders, ["姓名", "name"]);
-          idxGrade = findColumn(rawHeaders, ["年級", "grade"]);
-          idxClass = findColumn(rawHeaders, ["班級", "class", "班"]);
-          idxSeat = findColumn(rawHeaders, ["座號", "seat"]);
-          idxId = findColumn(rawHeaders, [
+          let idxGradeH = findColumn(rawHeaders, ["年級", "grade"]);
+          const idxClassH = findColumn(rawHeaders, ["班級", "class", "班"]);
+          let idxIdH = findColumn(rawHeaders, [
             "身分證字號", "身份證字號", "身分證", "身份證", "證照號碼", "id", "idnumber",
           ]);
+          const idxNameH = findColumn(rawHeaders, ["姓名", "name"]);
+          const idxSeatH = findColumn(rawHeaders, ["座號", "seat"]);
+
+          let gradeFromClassH = false;
+          if (idxGradeH === -1 && idxClassH !== -1) {
+            if (classColHasClassCodes(rows, 1, idxClassH)) {
+              idxGradeH = idxClassH;
+              gradeFromClassH = true;
+            }
+          }
+          if (idxIdH === -1) {
+            const exclude = [idxNameH, idxGradeH, idxClassH, idxSeatH].filter((x) => x !== -1);
+            idxIdH = detectIdColumnByContent(rows, 1, exclude);
+          }
+
+          idxName = idxNameH;
+          idxGrade = idxGradeH;
+          idxClass = idxClassH;
+          idxSeat = idxSeatH;
+          idxId = idxIdH;
+          gradeFromClass = gradeFromClassH;
+
           if (idxId === -1) warnings.push("找不到「身分證字號」欄位");
           if (idxName === -1) warnings.push("找不到「姓名」欄位");
+          if (gradeFromClass) warnings.push("年級已從班級代碼自動辨識（例：203 → 2年級3班）");
         } else {
           dataStartRow = 0;
           const detected = detectColumnsByContent(rows);
