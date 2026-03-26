@@ -119,6 +119,28 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
   const normalCount = filterResults.filter((r) => r.status === "normal").length;
   const excludedCount = filterResults.filter((r) => r.status === "excluded").length;
 
+  const activeResults = filterResults.filter((r) => r.status !== "excluded");
+
+  const gradeStats = useMemo(() => {
+    const map: Record<number, number> = {};
+    for (const r of activeResults) {
+      map[r.grade] = (map[r.grade] || 0) + 1;
+    }
+    return Object.entries(map)
+      .map(([g, count]) => ({ grade: Number(g), count }))
+      .sort((a, b) => a.grade - b.grade);
+  }, [filterResults]);
+
+  const subjectStats = useMemo(() => {
+    const map: Partial<Record<Subject, number>> = {};
+    for (const r of activeResults) {
+      map[r.filterSubject] = (map[r.filterSubject] || 0) + 1;
+    }
+    return (["chinese", "english", "math"] as Subject[])
+      .filter((s) => map[s] !== undefined)
+      .map((s) => ({ subject: s, count: map[s]! }));
+  }, [filterResults]);
+
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -143,6 +165,70 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
           <p className="text-2xl font-bold text-gray-500 mt-1">{excludedCount}</p>
         </div>
       </div>
+
+      {(gradeStats.length > 0 || subjectStats.length > 0) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {gradeStats.length > 0 && (
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">各年級人數</h3>
+              <div className="space-y-2">
+                {gradeStats.map(({ grade, count }) => {
+                  const max = Math.max(...gradeStats.map((g) => g.count));
+                  const pct = Math.round((count / max) * 100);
+                  return (
+                    <div key={grade} className="flex items-center gap-3">
+                      <span className="text-xs text-gray-600 w-14 flex-shrink-0">
+                        {GRADE_LABELS[grade] || `${grade}年級`}
+                      </span>
+                      <div className="flex-1 bg-gray-100 rounded-full h-2">
+                        <div
+                          className="bg-blue-500 h-2 rounded-full transition-all"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <span className="text-xs font-semibold text-gray-800 w-8 text-right">
+                        {count}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {subjectStats.length > 0 && (
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">各科目人數</h3>
+              <div className="space-y-2">
+                {subjectStats.map(({ subject, count }) => {
+                  const max = Math.max(...subjectStats.map((s) => s.count));
+                  const pct = Math.round((count / max) * 100);
+                  const colors: Record<Subject, string> = {
+                    chinese: "bg-rose-400",
+                    english: "bg-blue-400",
+                    math: "bg-emerald-400",
+                  };
+                  return (
+                    <div key={subject} className="flex items-center gap-3">
+                      <span className="text-xs text-gray-600 w-14 flex-shrink-0">
+                        {SUBJECT_LABELS[subject]}
+                      </span>
+                      <div className="flex-1 bg-gray-100 rounded-full h-2">
+                        <div
+                          className={`${colors[subject]} h-2 rounded-full transition-all`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <span className="text-xs font-semibold text-gray-800 w-8 text-right">
+                        {count}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row gap-3">
