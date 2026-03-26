@@ -53,6 +53,15 @@ function isGradeOnly(val: string): boolean {
   return !isNaN(n) && n >= 1 && n <= 6 && String(n) === val.trim();
 }
 
+interface ColRates {
+  id: number;
+  classCode: number;
+  grade: number;
+  name: number;
+  score: number;
+  seat: number;
+}
+
 function detectColumnsByContent(dataRows: string[][]): {
   idxName: number;
   idxGrade: number;
@@ -65,30 +74,26 @@ function detectColumnsByContent(dataRows: string[][]): {
   const numCols = Math.max(...dataRows.map((r) => r.length));
   const sample = dataRows.slice(0, Math.min(20, dataRows.length));
 
-  const colScores: Record<string, number[]> = {};
+  const rates: ColRates[] = [];
   for (let c = 0; c < numCols; c++) {
     const vals = sample.map((r) => String(r[c] ?? "").trim()).filter(Boolean);
-    colScores.id = colScores.id ?? [];
-    colScores.classCode = colScores.classCode ?? [];
-    colScores.name = colScores.name ?? [];
-    colScores.score = colScores.score ?? [];
-    colScores.seat = colScores.seat ?? [];
-    colScores.grade = colScores.grade ?? [];
-
-    colScores.id[c] = vals.filter(isTaiwanId).length / (vals.length || 1);
-    colScores.classCode[c] = vals.filter(isClassCode).length / (vals.length || 1);
-    colScores.grade[c] = vals.filter(isGradeOnly).length / (vals.length || 1);
-    colScores.name[c] = vals.filter(isChineseName).length / (vals.length || 1);
-    colScores.score[c] = vals.filter(isScore).length / (vals.length || 1);
-    colScores.seat[c] = vals.filter(isSmallInt).length / (vals.length || 1);
+    const total = vals.length || 1;
+    rates[c] = {
+      id: vals.filter(isTaiwanId).length / total,
+      classCode: vals.filter(isClassCode).length / total,
+      grade: vals.filter(isGradeOnly).length / total,
+      name: vals.filter(isChineseName).length / total,
+      score: vals.filter(isScore).length / total,
+      seat: vals.filter(isSmallInt).length / total,
+    };
   }
 
-  const bestCol = (key: string, exclude: number[] = []): number => {
+  const bestCol = (key: keyof ColRates, exclude: number[] = [], threshold = 0.3): number => {
     let best = -1;
-    let bestVal = 0.4;
+    let bestVal = threshold;
     for (let c = 0; c < numCols; c++) {
       if (exclude.includes(c)) continue;
-      const v = colScores[key][c] ?? 0;
+      const v = rates[c][key];
       if (v > bestVal) {
         bestVal = v;
         best = c;
@@ -228,9 +233,12 @@ export function parseScoreFile(
           idxScore = detected.idxScore;
           gradeFromClass = detected.gradeFromClass;
 
-          warnings.push("檔案無標題列，系統已自動辨識欄位");
+          if (gradeFromClass) {
+            warnings.push("年級已從班級代碼自動辨識（例：203 → 2年級3班）");
+          } else if (idxGrade === -1) {
+            warnings.push("找不到「年級」欄位，請確認格式");
+          }
           if (idxId === -1) warnings.push("找不到「身分證字號」欄位，請確認格式");
-          if (idxGrade === -1) warnings.push("找不到「年級」欄位，請確認格式");
           if (idxScore === -1) warnings.push("找不到成績欄位，請確認格式");
         }
 
@@ -340,7 +348,9 @@ export function parseListFile(file: File): Promise<ParseResult> {
           idxId = detected.idxId;
           gradeFromClass = detected.gradeFromClass;
 
-          warnings.push("檔案無標題列，系統已自動辨識欄位");
+          if (gradeFromClass) {
+            warnings.push("年級已從班級代碼自動辨識（例：203 → 2年級3班）");
+          }
           if (idxId === -1) warnings.push("找不到「身分證字號」欄位，請確認格式");
         }
 
