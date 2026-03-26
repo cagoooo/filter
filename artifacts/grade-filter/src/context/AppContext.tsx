@@ -6,7 +6,7 @@ interface AppContextType {
   englishData: Student[];
   mathData: Student[];
   currentStudents: Student[];
-  specialStudents: string[];
+  specialStudents: Student[];
   filterConfigs: FilterConfig[];
   filterResults: FilterResult[];
 
@@ -14,7 +14,7 @@ interface AppContextType {
   setEnglishData: (data: Student[]) => void;
   setMathData: (data: Student[]) => void;
   setCurrentStudents: (data: Student[]) => void;
-  setSpecialStudents: (ids: string[]) => void;
+  setSpecialStudents: (data: Student[]) => void;
   setFilterConfigs: (configs: FilterConfig[]) => void;
   runFilter: (configs?: FilterConfig[]) => void;
   clearResults: () => void;
@@ -27,7 +27,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [englishData, setEnglishData] = useState<Student[]>([]);
   const [mathData, setMathData] = useState<Student[]>([]);
   const [currentStudents, setCurrentStudents] = useState<Student[]>([]);
-  const [specialStudents, setSpecialStudents] = useState<string[]>([]);
+  const [specialStudents, setSpecialStudents] = useState<Student[]>([]);
   const [filterConfigs, setFilterConfigs] = useState<FilterConfig[]>([]);
   const [filterResults, setFilterResults] = useState<FilterResult[]>([]);
 
@@ -40,7 +40,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   function runFilter(configs?: FilterConfig[]) {
     const activeConfigs = configs ?? filterConfigs;
     const allResults: FilterResult[] = [];
-    const specialIdSet = new Set(specialStudents.map((id) => id.trim()));
+    const specialIdSet = new Set(specialStudents.map((s) => s.idNumber.trim()));
     const currentIdSet = new Set(currentStudents.map((s) => s.idNumber.trim()));
 
     const allDataBySubject: Record<Subject, Student[]> = {
@@ -49,13 +49,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
       math: mathData,
     };
 
+    const enrichScores = (s: Student): Partial<Record<Subject, number>> => {
+      const scores: Partial<Record<Subject, number>> = {};
+      for (const subj of ["chinese", "english", "math"] as Subject[]) {
+        const subjectData = allDataBySubject[subj];
+        const match = subjectData.find(
+          (d) => d.idNumber.trim() === s.idNumber.trim()
+        );
+        if (match && match[subj] !== undefined) {
+          scores[subj] = match[subj] as number;
+        }
+      }
+      return scores;
+    };
+
     for (const config of activeConfigs) {
       const data = getSubjectData(config.subject);
       const gradeData = data.filter((s) => s.grade === config.grade);
 
-      const specialInGrade = gradeData.filter((s) =>
-        specialIdSet.has(s.idNumber.trim())
-      );
       const nonSpecial = gradeData.filter(
         (s) => !specialIdSet.has(s.idNumber.trim())
       );
@@ -82,20 +93,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
           !specialIdSet.has(s.idNumber.trim()) &&
           !selectedIdSet.has(s.idNumber.trim())
       );
-
-      const enrichScores = (s: Student): Partial<Record<Subject, number>> => {
-        const scores: Partial<Record<Subject, number>> = {};
-        for (const subj of ["chinese", "english", "math"] as Subject[]) {
-          const subjectData = allDataBySubject[subj];
-          const match = subjectData.find(
-            (d) => d.idNumber.trim() === s.idNumber.trim()
-          );
-          if (match && match[subj] !== undefined) {
-            scores[subj] = match[subj] as number;
-          }
-        }
-        return scores;
-      };
 
       for (const s of selected) {
         const score = s[config.subject] ?? 0;
@@ -128,7 +125,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      for (const s of specialInGrade) {
+      const specialInConfig = specialStudents.filter(
+        (s) => s.grade === config.grade
+      );
+
+      for (const s of specialInConfig) {
         const score = s[config.subject] ?? 0;
         const rowId = `excluded-${s.idNumber.trim()}-${config.subject}`;
         if (!allResults.find((r) => r.id === rowId)) {
