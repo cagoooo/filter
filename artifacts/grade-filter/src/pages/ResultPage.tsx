@@ -3,21 +3,14 @@ import { useAppContext } from "../context/AppContext";
 import { FilterResult, Subject, SUBJECT_LABELS, GRADE_LABELS } from "../types";
 import { exportToExcel, exportToCsv } from "../lib/excel";
 import {
-  ArrowLeft,
-  FileSpreadsheet,
-  FileText,
-  Star,
-  Users,
-  ChevronUp,
-  ChevronDown,
-  Search,
-  RefreshCw,
-  UserX,
+  ArrowLeft, FileSpreadsheet, FileText, Star, Users,
+  ChevronUp, ChevronDown, Search, RefreshCw, UserX, List, LayoutList,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type SortKey = keyof FilterResult | "none";
 type SortDir = "asc" | "desc";
+type ViewMode = "list" | "grouped";
 
 export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; onReset: () => void }) {
   const { filterResults } = useAppContext();
@@ -27,79 +20,60 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
   const [gradeFilter, setGradeFilter] = useState<number | "all">("all");
   const [subjectFilter, setSubjectFilter] = useState<Subject | "all">("all");
   const [showExcluded, setShowExcluded] = useState(true);
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
 
-  const grades = useMemo(
-    () =>
-      [...new Set(filterResults.map((r) => r.grade))].sort((a, b) => a - b),
-    [filterResults]
-  );
-
-  const subjects = useMemo(
-    () =>
-      [...new Set(filterResults.map((r) => r.filterSubject))] as Subject[],
-    [filterResults]
-  );
+  const grades = useMemo(() => [...new Set(filterResults.map((r) => r.grade))].sort((a, b) => a - b), [filterResults]);
+  const subjects = useMemo(() => [...new Set(filterResults.map((r) => r.filterSubject))] as Subject[], [filterResults]);
 
   const filtered = useMemo(() => {
-    let data = filterResults.filter(
-      (r) => r.status !== "excluded" || showExcluded
-    );
-
-    if (gradeFilter !== "all") {
-      data = data.filter((r) => r.grade === gradeFilter);
-    }
-    if (subjectFilter !== "all") {
-      data = data.filter((r) => r.filterSubject === subjectFilter);
-    }
+    let data = filterResults.filter((r) => r.status !== "excluded" || showExcluded);
+    if (gradeFilter !== "all") data = data.filter((r) => r.grade === gradeFilter);
+    if (subjectFilter !== "all") data = data.filter((r) => r.filterSubject === subjectFilter);
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       data = data.filter(
-        (r) =>
-          r.name.toLowerCase().includes(q) ||
-          r.idNumber.toLowerCase().includes(q) ||
-          r.class.toLowerCase().includes(q)
+        (r) => r.name.toLowerCase().includes(q) || r.idNumber.toLowerCase().includes(q) || r.class.toLowerCase().includes(q)
       );
     }
-
     if (sortKey !== "none") {
       data = [...data].sort((a, b) => {
         const aVal = a[sortKey as keyof FilterResult] ?? "";
         const bVal = b[sortKey as keyof FilterResult] ?? "";
-        if (typeof aVal === "number" && typeof bVal === "number") {
-          return sortDir === "asc" ? aVal - bVal : bVal - aVal;
-        }
+        if (typeof aVal === "number" && typeof bVal === "number") return sortDir === "asc" ? aVal - bVal : bVal - aVal;
         return sortDir === "asc"
           ? String(aVal).localeCompare(String(bVal), "zh-TW")
           : String(bVal).localeCompare(String(aVal), "zh-TW");
       });
     }
-
     return data;
   }, [filterResults, gradeFilter, subjectFilter, search, sortKey, sortDir, showExcluded]);
 
-  const toggleSort = (key: SortKey) => {
-    if (sortKey === key) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setSortKey(key);
-      setSortDir("asc");
+  const groupedData = useMemo(() => {
+    const map = new Map<string, FilterResult[]>();
+    const sorted = [...filtered].sort((a, b) => {
+      if (a.grade !== b.grade) return a.grade - b.grade;
+      return String(a.class).localeCompare(String(b.class), "zh-TW");
+    });
+    for (const r of sorted) {
+      const key = `${r.grade}-${r.class}`;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(r);
     }
+    return map;
+  }, [filtered]);
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortKey(key); setSortDir("asc"); }
   };
 
   const SortIcon = ({ k }: { k: SortKey }) => {
-    if (sortKey !== k)
-      return <ChevronUp className="w-3.5 h-3.5 text-gray-300" />;
-    return sortDir === "asc" ? (
-      <ChevronUp className="w-3.5 h-3.5 text-blue-600" />
-    ) : (
-      <ChevronDown className="w-3.5 h-3.5 text-blue-600" />
-    );
+    if (sortKey !== k) return <ChevronUp className="w-3.5 h-3.5 text-gray-300" />;
+    return sortDir === "asc" ? <ChevronUp className="w-3.5 h-3.5 text-blue-600" /> : <ChevronDown className="w-3.5 h-3.5 text-blue-600" />;
   };
 
   const exportData = (includeExcluded = false) => {
-    const rows = filterResults.filter(
-      (r) => r.status !== "excluded" || includeExcluded
-    );
+    const rows = filterResults.filter((r) => r.status !== "excluded" || includeExcluded);
     return rows.map((r) => ({
       狀態: r.status === "priority" ? "優先" : r.status === "excluded" ? "已排除（特生）" : "一般",
       姓名: r.name,
@@ -118,43 +92,43 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
   const priorityCount = filterResults.filter((r) => r.status === "priority").length;
   const normalCount = filterResults.filter((r) => r.status === "normal").length;
   const excludedCount = filterResults.filter((r) => r.status === "excluded").length;
-
   const activeResults = filterResults.filter((r) => r.status !== "excluded");
 
   const gradeStats = useMemo(() => {
     const map: Record<number, number> = {};
-    for (const r of activeResults) {
-      map[r.grade] = (map[r.grade] || 0) + 1;
-    }
-    return Object.entries(map)
-      .map(([g, count]) => ({ grade: Number(g), count }))
-      .sort((a, b) => a.grade - b.grade);
+    for (const r of activeResults) map[r.grade] = (map[r.grade] || 0) + 1;
+    return Object.entries(map).map(([g, count]) => ({ grade: Number(g), count })).sort((a, b) => a.grade - b.grade);
   }, [filterResults]);
 
   const subjectStats = useMemo(() => {
     const map: Partial<Record<Subject, number>> = {};
-    for (const r of activeResults) {
-      map[r.filterSubject] = (map[r.filterSubject] || 0) + 1;
-    }
-    return (["chinese", "english", "math"] as Subject[])
-      .filter((s) => map[s] !== undefined)
-      .map((s) => ({ subject: s, count: map[s]! }));
+    for (const r of activeResults) map[r.filterSubject] = (map[r.filterSubject] || 0) + 1;
+    return (["chinese", "english", "math"] as Subject[]).filter((s) => map[s] !== undefined).map((s) => ({ subject: s, count: map[s]! }));
   }, [filterResults]);
+
+  const TABLE_COLS = [
+    { key: "status", label: "狀態" },
+    { key: "name", label: "姓名" },
+    { key: "grade", label: "年級" },
+    { key: "class", label: "班級" },
+    { key: "seatNo", label: "座號" },
+    { key: "idNumber", label: "身分證字號" },
+    { key: "chinese", label: "國文" },
+    { key: "english", label: "英文" },
+    { key: "math", label: "數學" },
+    { key: "filterSubject", label: "篩選科目" },
+  ];
 
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
           <p className="text-xs text-gray-500 font-medium">篩選名單人次</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">
-            {priorityCount + normalCount}
-          </p>
+          <p className="text-2xl font-bold text-gray-900 mt-1">{priorityCount + normalCount}</p>
         </div>
         <div className="bg-white rounded-xl border border-amber-200 p-4 shadow-sm bg-amber-50/40">
           <p className="text-xs text-amber-600 font-medium">優先（在校生）</p>
-          <p className="text-2xl font-bold text-amber-600 mt-1">
-            {priorityCount}
-          </p>
+          <p className="text-2xl font-bold text-amber-600 mt-1">{priorityCount}</p>
         </div>
         <div className="bg-white rounded-xl border border-blue-200 p-4 shadow-sm bg-blue-50/30">
           <p className="text-xs text-blue-600 font-medium">一般篩選</p>
@@ -174,21 +148,13 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
               <div className="space-y-2">
                 {gradeStats.map(({ grade, count }) => {
                   const max = Math.max(...gradeStats.map((g) => g.count));
-                  const pct = Math.round((count / max) * 100);
                   return (
                     <div key={grade} className="flex items-center gap-3">
-                      <span className="text-xs text-gray-600 w-14 flex-shrink-0">
-                        {GRADE_LABELS[grade] || `${grade}年級`}
-                      </span>
+                      <span className="text-xs text-gray-600 w-14 flex-shrink-0">{GRADE_LABELS[grade] || `${grade}年級`}</span>
                       <div className="flex-1 bg-gray-100 rounded-full h-2">
-                        <div
-                          className="bg-blue-500 h-2 rounded-full transition-all"
-                          style={{ width: `${pct}%` }}
-                        />
+                        <div className="bg-blue-500 h-2 rounded-full transition-all" style={{ width: `${Math.round((count / max) * 100)}%` }} />
                       </div>
-                      <span className="text-xs font-semibold text-gray-800 w-8 text-right">
-                        {count}
-                      </span>
+                      <span className="text-xs font-semibold text-gray-800 w-8 text-right">{count}</span>
                     </div>
                   );
                 })}
@@ -201,26 +167,14 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
               <div className="space-y-2">
                 {subjectStats.map(({ subject, count }) => {
                   const max = Math.max(...subjectStats.map((s) => s.count));
-                  const pct = Math.round((count / max) * 100);
-                  const colors: Record<Subject, string> = {
-                    chinese: "bg-rose-400",
-                    english: "bg-blue-400",
-                    math: "bg-emerald-400",
-                  };
+                  const colors: Record<Subject, string> = { chinese: "bg-rose-400", english: "bg-blue-400", math: "bg-emerald-400" };
                   return (
                     <div key={subject} className="flex items-center gap-3">
-                      <span className="text-xs text-gray-600 w-14 flex-shrink-0">
-                        {SUBJECT_LABELS[subject]}
-                      </span>
+                      <span className="text-xs text-gray-600 w-14 flex-shrink-0">{SUBJECT_LABELS[subject]}</span>
                       <div className="flex-1 bg-gray-100 rounded-full h-2">
-                        <div
-                          className={`${colors[subject]} h-2 rounded-full transition-all`}
-                          style={{ width: `${pct}%` }}
-                        />
+                        <div className={`${colors[subject]} h-2 rounded-full transition-all`} style={{ width: `${Math.round((count / max) * 100)}%` }} />
                       </div>
-                      <span className="text-xs font-semibold text-gray-800 w-8 text-right">
-                        {count}
-                      </span>
+                      <span className="text-xs font-semibold text-gray-800 w-8 text-right">{count}</span>
                     </div>
                   );
                 })}
@@ -246,33 +200,45 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
             <select
               className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={gradeFilter}
-              onChange={(e) =>
-                setGradeFilter(
-                  e.target.value === "all" ? "all" : Number(e.target.value)
-                )
-              }
+              onChange={(e) => setGradeFilter(e.target.value === "all" ? "all" : Number(e.target.value))}
             >
               <option value="all">全部年級</option>
-              {grades.map((g) => (
-                <option key={g} value={g}>
-                  {GRADE_LABELS[g] || `${g}年級`}
-                </option>
-              ))}
+              {grades.map((g) => <option key={g} value={g}>{GRADE_LABELS[g] || `${g}年級`}</option>)}
             </select>
             <select
               className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={subjectFilter}
-              onChange={(e) =>
-                setSubjectFilter(e.target.value as Subject | "all")
-              }
+              onChange={(e) => setSubjectFilter(e.target.value as Subject | "all")}
             >
               <option value="all">全部科目</option>
-              {subjects.map((s) => (
-                <option key={s} value={s}>
-                  {SUBJECT_LABELS[s]}
-                </option>
-              ))}
+              {subjects.map((s) => <option key={s} value={s}>{SUBJECT_LABELS[s]}</option>)}
             </select>
+
+            <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+              <button
+                onClick={() => setViewMode("list")}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors",
+                  viewMode === "list" ? "bg-blue-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"
+                )}
+                title="綜合列表"
+              >
+                <List className="w-4 h-4" />
+                列表
+              </button>
+              <button
+                onClick={() => setViewMode("grouped")}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors border-l border-gray-200",
+                  viewMode === "grouped" ? "bg-blue-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"
+                )}
+                title="分班顯示"
+              >
+                <LayoutList className="w-4 h-4" />
+                分班
+              </button>
+            </div>
+
             <button
               onClick={() => setShowExcluded((v) => !v)}
               className={cn(
@@ -302,112 +268,44 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100 bg-gray-50/30">
-                {[
-                  { key: "status", label: "狀態" },
-                  { key: "name", label: "姓名" },
-                  { key: "grade", label: "年級" },
-                  { key: "class", label: "班級" },
-                  { key: "seatNo", label: "座號" },
-                  { key: "idNumber", label: "身分證字號" },
-                  { key: "chinese", label: "國文" },
-                  { key: "english", label: "英文" },
-                  { key: "math", label: "數學" },
-                  { key: "filterSubject", label: "篩選科目" },
-                ].map(({ key, label }) => (
-                  <th
-                    key={key}
-                    className="px-4 py-3 text-left text-xs font-semibold text-gray-600 cursor-pointer select-none whitespace-nowrap"
-                    onClick={() => toggleSort(key as SortKey)}
-                  >
-                    <span className="flex items-center gap-1">
-                      {label}
-                      <SortIcon k={key as SortKey} />
-                    </span>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={10}
-                    className="px-4 py-12 text-center text-gray-400"
-                  >
-                    <Users className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                    <p>沒有符合條件的資料</p>
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((r) => (
-                  <tr
-                    key={r.id}
-                    className={cn(
-                      "border-b border-gray-50 transition-colors",
-                      r.status === "excluded"
-                        ? "bg-gray-50/80 opacity-60"
-                        : r.status === "priority"
-                        ? "bg-amber-50/40 hover:bg-amber-50/60"
-                        : "hover:bg-gray-50/50"
-                    )}
-                  >
-                    <td className="px-4 py-3">
-                      {r.status === "priority" ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-100 rounded-full px-2.5 py-1">
-                          <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
-                          優先
-                        </span>
-                      ) : r.status === "excluded" ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-gray-500 bg-gray-100 rounded-full px-2.5 py-1">
-                          <UserX className="w-3 h-3" />
-                          已排除
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 bg-blue-50 rounded-full px-2.5 py-1">
-                          一般
-                        </span>
-                      )}
-                    </td>
-                    <td className={cn("px-4 py-3 font-medium", r.status === "excluded" ? "text-gray-400" : "text-gray-900")}>
-                      {r.name}
-                    </td>
-                    <td className="px-4 py-3 text-gray-500 text-xs">
-                      {GRADE_LABELS[r.grade] || `${r.grade}年級`}
-                    </td>
-                    <td className="px-4 py-3 text-gray-500 text-xs">{r.class}</td>
-                    <td className="px-4 py-3 text-gray-500 text-xs">{r.seatNo}</td>
-                    <td className={cn("px-4 py-3 font-mono text-xs", r.status === "excluded" ? "text-gray-400" : "text-gray-700")}>
-                      {r.idNumber}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <ScoreCell value={r.chinese} isFilter={r.filterSubject === "chinese"} isExcluded={r.status === "excluded"} />
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <ScoreCell value={r.english} isFilter={r.filterSubject === "english"} isExcluded={r.status === "excluded"} />
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <ScoreCell value={r.math} isFilter={r.filterSubject === "math"} isExcluded={r.status === "excluded"} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="text-xs font-medium text-gray-600 bg-gray-100 rounded-full px-2.5 py-1">
-                        {SUBJECT_LABELS[r.filterSubject]}
-                      </span>
-                    </td>
+        {viewMode === "list" ? (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50/30">
+                    {TABLE_COLS.map(({ key, label }) => (
+                      <th
+                        key={key}
+                        className="px-4 py-3 text-left text-xs font-semibold text-gray-600 cursor-pointer select-none whitespace-nowrap"
+                        onClick={() => toggleSort(key as SortKey)}
+                      >
+                        <span className="flex items-center gap-1">{label}<SortIcon k={key as SortKey} /></span>
+                      </th>
+                    ))}
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="px-5 py-3 border-t border-gray-100 text-xs text-gray-500 bg-gray-50/30">
-          顯示 {filtered.length} 筆
-          {excludedCount > 0 && !showExcluded && `（另有 ${excludedCount} 名特生已隱藏）`}
-        </div>
+                </thead>
+                <tbody>
+                  {filtered.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} className="px-4 py-12 text-center text-gray-400">
+                        <Users className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                        <p>沒有符合條件的資料</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    filtered.map((r) => <ResultRow key={r.id} r={r} />)
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className="px-5 py-3 border-t border-gray-100 text-xs text-gray-500 bg-gray-50/30">
+              顯示 {filtered.length} 筆{excludedCount > 0 && !showExcluded && `（另有 ${excludedCount} 名特生已隱藏）`}
+            </div>
+          </>
+        ) : (
+          <GroupedView groupedData={groupedData} showExcluded={showExcluded} excludedCount={excludedCount} totalShown={filtered.length} />
+        )}
       </div>
 
       <div className="flex justify-between items-center pt-1">
@@ -430,15 +328,176 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
   );
 }
 
-function ScoreCell({ value, isFilter, isExcluded }: { value?: number; isFilter: boolean; isExcluded: boolean }) {
-  if (value === undefined || value === null) {
-    return <span className="text-gray-300 text-xs">—</span>;
-  }
+function ResultRow({ r }: { r: FilterResult }) {
   return (
-    <span className={cn(
-      "text-sm font-semibold",
-      isExcluded ? "text-gray-400" : isFilter ? "text-blue-700" : "text-gray-700"
-    )}>
+    <tr
+      className={cn(
+        "border-b border-gray-50 transition-colors",
+        r.status === "excluded" ? "bg-gray-50/80 opacity-60"
+          : r.status === "priority" ? "bg-amber-50/40 hover:bg-amber-50/60"
+          : "hover:bg-gray-50/50"
+      )}
+    >
+      <td className="px-4 py-3">
+        {r.status === "priority" ? (
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-100 rounded-full px-2.5 py-1">
+            <Star className="w-3 h-3 fill-amber-500 text-amber-500" />優先
+          </span>
+        ) : r.status === "excluded" ? (
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-gray-500 bg-gray-100 rounded-full px-2.5 py-1">
+            <UserX className="w-3 h-3" />已排除
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 bg-blue-50 rounded-full px-2.5 py-1">一般</span>
+        )}
+      </td>
+      <td className={cn("px-4 py-3 font-medium", r.status === "excluded" ? "text-gray-400" : "text-gray-900")}>{r.name}</td>
+      <td className="px-4 py-3 text-gray-500 text-xs">{GRADE_LABELS[r.grade] || `${r.grade}年級`}</td>
+      <td className="px-4 py-3 text-gray-500 text-xs">{r.class}</td>
+      <td className="px-4 py-3 text-gray-500 text-xs">{r.seatNo}</td>
+      <td className={cn("px-4 py-3 font-mono text-xs", r.status === "excluded" ? "text-gray-400" : "text-gray-700")}>{r.idNumber}</td>
+      <td className="px-4 py-3 text-center"><ScoreCell value={r.chinese} isFilter={r.filterSubject === "chinese"} isExcluded={r.status === "excluded"} /></td>
+      <td className="px-4 py-3 text-center"><ScoreCell value={r.english} isFilter={r.filterSubject === "english"} isExcluded={r.status === "excluded"} /></td>
+      <td className="px-4 py-3 text-center"><ScoreCell value={r.math} isFilter={r.filterSubject === "math"} isExcluded={r.status === "excluded"} /></td>
+      <td className="px-4 py-3">
+        <span className="text-xs font-medium text-gray-600 bg-gray-100 rounded-full px-2.5 py-1">{SUBJECT_LABELS[r.filterSubject]}</span>
+      </td>
+    </tr>
+  );
+}
+
+function GroupedView({
+  groupedData, showExcluded, excludedCount, totalShown,
+}: {
+  groupedData: Map<string, FilterResult[]>;
+  showExcluded: boolean;
+  excludedCount: number;
+  totalShown: number;
+}) {
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+
+  const toggle = (key: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+
+  if (groupedData.size === 0) {
+    return (
+      <div className="px-4 py-12 text-center text-gray-400">
+        <Users className="w-10 h-10 mx-auto mb-2 opacity-30" />
+        <p>沒有符合條件的資料</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="divide-y divide-gray-100">
+        {[...groupedData.entries()].map(([key, rows]) => {
+          const isCollapsed = collapsed.has(key);
+          const first = rows[0];
+          const activeCount = rows.filter((r) => r.status !== "excluded").length;
+          const priorityCount = rows.filter((r) => r.status === "priority").length;
+          const excludedInGroup = rows.filter((r) => r.status === "excluded").length;
+
+          return (
+            <div key={key}>
+              <button
+                className="w-full px-5 py-3 flex items-center justify-between bg-gray-50/60 hover:bg-gray-100/40 transition-colors"
+                onClick={() => toggle(key)}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="font-semibold text-gray-800 text-sm">
+                    {GRADE_LABELS[first.grade] || `${first.grade}年級`} · {first.class}
+                  </span>
+                  <span className="text-xs text-gray-500 bg-white border border-gray-200 rounded-full px-2.5 py-0.5">
+                    {activeCount} 人
+                  </span>
+                  {priorityCount > 0 && (
+                    <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-0.5">
+                      優先 {priorityCount}
+                    </span>
+                  )}
+                  {excludedInGroup > 0 && showExcluded && (
+                    <span className="text-xs text-gray-400 bg-gray-50 border border-gray-200 rounded-full px-2.5 py-0.5">
+                      特生 {excludedInGroup}
+                    </span>
+                  )}
+                </div>
+                {isCollapsed ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronUp className="w-4 h-4 text-gray-400" />}
+              </button>
+
+              {!isCollapsed && (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100">
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">狀態</th>
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">座號</th>
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">姓名</th>
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">身分證字號</th>
+                        <th className="px-4 py-2 text-center text-xs font-semibold text-gray-500">國文</th>
+                        <th className="px-4 py-2 text-center text-xs font-semibold text-gray-500">英文</th>
+                        <th className="px-4 py-2 text-center text-xs font-semibold text-gray-500">數學</th>
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">篩選科目</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((r) => (
+                        <tr
+                          key={r.id}
+                          className={cn(
+                            "border-b border-gray-50",
+                            r.status === "excluded" ? "opacity-50"
+                              : r.status === "priority" ? "bg-amber-50/30"
+                              : ""
+                          )}
+                        >
+                          <td className="px-4 py-2">
+                            {r.status === "priority" ? (
+                              <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-100 rounded-full px-2 py-0.5">
+                                <Star className="w-2.5 h-2.5 fill-amber-500 text-amber-500" />優先
+                              </span>
+                            ) : r.status === "excluded" ? (
+                              <span className="text-xs text-gray-400">特生</span>
+                            ) : (
+                              <span className="text-xs text-blue-600 font-medium">一般</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2 text-xs text-gray-500">{r.seatNo}</td>
+                          <td className={cn("px-4 py-2 font-medium text-sm", r.status === "excluded" ? "text-gray-400" : "text-gray-900")}>{r.name}</td>
+                          <td className="px-4 py-2 font-mono text-xs text-gray-600">{r.idNumber}</td>
+                          <td className="px-4 py-2 text-center"><ScoreCell value={r.chinese} isFilter={r.filterSubject === "chinese"} isExcluded={r.status === "excluded"} /></td>
+                          <td className="px-4 py-2 text-center"><ScoreCell value={r.english} isFilter={r.filterSubject === "english"} isExcluded={r.status === "excluded"} /></td>
+                          <td className="px-4 py-2 text-center"><ScoreCell value={r.math} isFilter={r.filterSubject === "math"} isExcluded={r.status === "excluded"} /></td>
+                          <td className="px-4 py-2">
+                            <span className="text-xs font-medium text-gray-600 bg-gray-100 rounded-full px-2 py-0.5">{SUBJECT_LABELS[r.filterSubject]}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div className="px-5 py-3 border-t border-gray-100 text-xs text-gray-500 bg-gray-50/30">
+        共 {groupedData.size} 個班級，顯示 {totalShown} 筆
+        {excludedCount > 0 && !showExcluded && `（另有 ${excludedCount} 名特生已隱藏）`}
+      </div>
+    </>
+  );
+}
+
+function ScoreCell({ value, isFilter, isExcluded }: { value?: number; isFilter: boolean; isExcluded: boolean }) {
+  if (value === undefined || value === null) return <span className="text-gray-300 text-xs">—</span>;
+  return (
+    <span className={cn("text-sm font-semibold", isExcluded ? "text-gray-400" : isFilter ? "text-blue-700" : "text-gray-700")}>
       {value}
     </span>
   );
