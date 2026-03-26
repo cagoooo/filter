@@ -1,11 +1,42 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useAppContext } from "../context/AppContext";
 import { FilterConfig, Subject, SUBJECT_LABELS, GRADE_LABELS } from "../types";
-import { Plus, Trash2, ArrowRight, ArrowLeft, Play, Settings2, ChevronDown, ChevronUp, Layers } from "lucide-react";
+import { Plus, Trash2, ArrowLeft, Play, Settings2, ChevronDown, ChevronUp, Layers, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const GRADES = [1, 2, 3, 4, 5, 6];
 const SUBJECTS: Subject[] = ["chinese", "english", "math"];
+
+interface IdMismatch {
+  name: string;
+  subjects: { subject: string; idNumber: string }[];
+}
+
+function detectCrossSubjectMismatches(
+  datasets: { label: string; data: { name: string; idNumber: string }[] }[]
+): IdMismatch[] {
+  const nameToIds = new Map<string, Map<string, string>>();
+  for (const { label, data } of datasets) {
+    for (const s of data) {
+      const norm = s.name.trim();
+      if (!norm || !s.idNumber) continue;
+      if (!nameToIds.has(norm)) nameToIds.set(norm, new Map());
+      nameToIds.get(norm)!.set(label, s.idNumber.trim().toUpperCase());
+    }
+  }
+  const mismatches: IdMismatch[] = [];
+  for (const [name, subjectIds] of nameToIds) {
+    if (subjectIds.size < 2) continue;
+    const uniqueIds = new Set(subjectIds.values());
+    if (uniqueIds.size > 1) {
+      mismatches.push({
+        name,
+        subjects: Array.from(subjectIds.entries()).map(([subject, idNumber]) => ({ subject, idNumber })),
+      });
+    }
+  }
+  return mismatches;
+}
 
 export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onNext: () => void }) {
   const { filterConfigs, setFilterConfigs, runFilter, chineseData, englishData, mathData } = useAppContext();
@@ -22,6 +53,17 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
       : [{ grade: 1, subject: "chinese", mode: "percent", value: 20 }]
   );
 
+  const idMismatches = useMemo(() => {
+    const datasets = [
+      { label: "國文成績", data: chineseData },
+      { label: "英文成績", data: englishData },
+      { label: "數學成績", data: mathData },
+    ].filter((d) => d.data.length > 0);
+    if (datasets.length < 2) return [];
+    return detectCrossSubjectMismatches(datasets);
+  }, [chineseData, englishData, mathData]);
+
+  const [mismatchExpanded, setMismatchExpanded] = useState(false);
   const [batchExpanded, setBatchExpanded] = useState(false);
   const [batchSubject, setBatchSubject] = useState<Subject>("chinese");
   const [batchMode, setBatchMode] = useState<"percent" | "count">("percent");
@@ -85,6 +127,43 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
 
   return (
     <div className="space-y-6">
+
+      {idMismatches.length > 0 && (
+        <div className="rounded-xl border border-red-300 bg-red-50 overflow-hidden">
+          <button
+            className="w-full px-4 py-3 flex items-center justify-between text-sm font-medium text-red-800 hover:bg-red-100/60 transition-colors"
+            onClick={() => setMismatchExpanded((p) => !p)}
+          >
+            <span className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-red-600" />
+              跨科目身分證不一致：發現 {idMismatches.length} 位學生在不同科目中的身分證字號不同，可能資料有誤
+            </span>
+            {mismatchExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
+          {mismatchExpanded && (
+            <div className="px-4 pb-4 space-y-3">
+              <p className="text-xs text-red-600 italic">
+                以下學生的姓名在多個科目成績中出現，但身分證字號不同。請回到上一步確認原始 Excel 資料是否正確。
+              </p>
+              <div className="space-y-2">
+                {idMismatches.map((m, i) => (
+                  <div key={i} className="bg-white rounded-lg border border-red-200 px-3 py-2">
+                    <p className="text-xs font-semibold text-red-800 mb-1">{m.name}</p>
+                    <div className="space-y-0.5">
+                      {m.subjects.map((s) => (
+                        <p key={s.subject} className="text-xs text-red-700 font-mono">
+                          {s.subject}：{s.idNumber.slice(0, 4)}****{s.idNumber.slice(-2)}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
           <div className="flex items-center gap-2">
