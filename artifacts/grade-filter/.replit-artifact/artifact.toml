@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "成績篩選系統"
+version = "1.0.0"
+id = "artifacts/grade-filter"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21302
+
+[services.development]
+run = "pnpm --filter @workspace/grade-filter run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/grade-filter", "run", "build" ]
+publicDir = "artifacts/grade-filter/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21302"
+BASE_PATH = "/"
