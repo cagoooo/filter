@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAppContext } from "../context/AppContext";
 import { parseScoreFile, parseListFile, ColumnMapping } from "../lib/excel";
 import FileUploadCard from "../components/FileUploadCard";
@@ -24,11 +24,19 @@ interface ScoreFileExtras {
 
 const defaultFileState: FileState = { status: "idle", warnings: [], count: 0 };
 
+function restoredState(fileName: string, count: number): FileState {
+  return { status: "success", fileName, warnings: [], count };
+}
+
 export default function ImportPage({ onNext }: { onNext: () => void }) {
   const {
     setChineseData, setEnglishData, setMathData,
     setCurrentStudents, setSpecialStudents,
     chineseData, englishData, mathData, currentStudents, specialStudents,
+    chineseFileName, englishFileName, mathFileName, currentFileName, specialFileName,
+    setChineseFileName, setEnglishFileName, setMathFileName,
+    setCurrentFileName, setSpecialFileName,
+    isLoading,
   } = useAppContext();
 
   const [chineseState, setChineseState] = useState<FileState>(defaultFileState);
@@ -41,18 +49,39 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
   const [englishExtras, setEnglishExtras] = useState<ScoreFileExtras | null>(null);
   const [mathExtras, setMathExtras] = useState<ScoreFileExtras | null>(null);
 
+  useEffect(() => {
+    if (isLoading) return;
+    if (chineseData.length > 0 && chineseState.status === "idle") {
+      setChineseState(restoredState(chineseFileName || "（上次匯入的資料）", chineseData.length));
+    }
+    if (englishData.length > 0 && englishState.status === "idle") {
+      setEnglishState(restoredState(englishFileName || "（上次匯入的資料）", englishData.length));
+    }
+    if (mathData.length > 0 && mathState.status === "idle") {
+      setMathState(restoredState(mathFileName || "（上次匯入的資料）", mathData.length));
+    }
+    if (currentStudents.length > 0 && currentState.status === "idle") {
+      setCurrentState(restoredState(currentFileName || "（上次匯入的資料）", currentStudents.length));
+    }
+    if (specialStudents.length > 0 && specialState.status === "idle") {
+      setSpecialState(restoredState(specialFileName || "（上次匯入的資料）", specialStudents.length));
+    }
+  }, [isLoading]);
+
   const handleScoreUpload = async (
     file: File,
     subject: Subject,
     setState: (s: FileState) => void,
     setData: (d: Student[]) => void,
-    setExtras: (e: ScoreFileExtras | null) => void
+    setExtras: (e: ScoreFileExtras | null) => void,
+    setFileName: (name: string) => void
   ) => {
     setState({ status: "loading", warnings: [], count: 0 });
     setExtras(null);
     try {
       const result = await parseScoreFile(file, subject);
       setData(result.students);
+      setFileName(file.name);
       setState({
         status: "success",
         fileName: file.name,
@@ -71,12 +100,10 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
   };
 
   const handleRemapped = (
-    subject: Subject,
     setData: (d: Student[]) => void,
     setState: (s: FileState) => void,
     setExtras: (e: ScoreFileExtras | null) => void,
-    rawRows: string[][],
-    mapping: ColumnMapping
+    rawRows: string[][]
   ) => (students: Student[], warnings: string[], newMapping: ColumnMapping) => {
     setData(students);
     setState((prev) => ({ ...prev, warnings, count: students.length }));
@@ -88,6 +115,7 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
     try {
       const result = await parseListFile(file);
       setCurrentStudents(result.students);
+      setCurrentFileName(file.name);
       setCurrentState({ status: "success", fileName: file.name, warnings: result.warnings, count: result.students.length });
     } catch (err: unknown) {
       setCurrentState({ status: "error", errorMessage: err instanceof Error ? err.message : "解析失敗", warnings: [], count: 0 });
@@ -99,10 +127,23 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
     try {
       const result = await parseListFile(file);
       setSpecialStudents(result.students);
+      setSpecialFileName(file.name);
       setSpecialState({ status: "success", fileName: file.name, warnings: result.warnings, count: result.students.length });
     } catch (err: unknown) {
       setSpecialState({ status: "error", errorMessage: err instanceof Error ? err.message : "解析失敗", warnings: [], count: 0 });
     }
+  };
+
+  const clearScore = (
+    setData: (d: Student[]) => void,
+    setState: (s: FileState) => void,
+    setExtras: (e: ScoreFileExtras | null) => void,
+    setFileName: (name: string) => void
+  ) => {
+    setData([]);
+    setState(defaultFileState);
+    setExtras(null);
+    setFileName("");
   };
 
   const hasAnyScore = chineseData.length > 0 || englishData.length > 0 || mathData.length > 0;
@@ -114,8 +155,8 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
         <div>
           <p className="text-sm font-medium text-blue-800">Excel 欄位格式說明</p>
           <p className="text-sm text-blue-700 mt-1">
-            每個成績檔案需包含：<strong>姓名、年級、班級、座號、身分證字號、成績</strong>（對應科目）等欄位。
-            欄位名稱不需完全一致，系統會自動辨識。上傳後可確認辨識結果，必要時可手動調整欄位對應。
+            每個成績檔案需包含：<strong>姓名、年級、班級、座號、身分證字號、成績</strong>等欄位。
+            欄位名稱不需完全一致，系統會自動辨識。資料會自動儲存在本裝置上，重新整理後仍可繼續操作。
           </p>
         </div>
       </div>
@@ -131,13 +172,13 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
               title="國文成績"
               description="期中考國文科成績"
               onFileSelect={(file) =>
-                handleScoreUpload(file, "chinese", setChineseState, setChineseData, setChineseExtras)
+                handleScoreUpload(file, "chinese", setChineseState, setChineseData, setChineseExtras, setChineseFileName)
               }
               status={chineseState.status}
               fileName={chineseState.fileName}
               errorMessage={chineseState.errorMessage}
               warnings={chineseState.warnings}
-              onClear={() => { setChineseData([]); setChineseState(defaultFileState); setChineseExtras(null); }}
+              onClear={() => clearScore(setChineseData, setChineseState, setChineseExtras, setChineseFileName)}
             />
             {chineseState.status === "success" && chineseExtras && (
               <UploadPreview
@@ -145,10 +186,7 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
                 students={chineseExtras.students}
                 rawRows={chineseExtras.rawRows}
                 mapping={chineseExtras.mapping}
-                onRemapped={handleRemapped(
-                  "chinese", setChineseData, setChineseState, setChineseExtras,
-                  chineseExtras.rawRows, chineseExtras.mapping
-                )}
+                onRemapped={handleRemapped(setChineseData, setChineseState, setChineseExtras, chineseExtras.rawRows)}
               />
             )}
           </div>
@@ -158,13 +196,13 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
               title="英文成績"
               description="期中考英文科成績"
               onFileSelect={(file) =>
-                handleScoreUpload(file, "english", setEnglishState, setEnglishData, setEnglishExtras)
+                handleScoreUpload(file, "english", setEnglishState, setEnglishData, setEnglishExtras, setEnglishFileName)
               }
               status={englishState.status}
               fileName={englishState.fileName}
               errorMessage={englishState.errorMessage}
               warnings={englishState.warnings}
-              onClear={() => { setEnglishData([]); setEnglishState(defaultFileState); setEnglishExtras(null); }}
+              onClear={() => clearScore(setEnglishData, setEnglishState, setEnglishExtras, setEnglishFileName)}
             />
             {englishState.status === "success" && englishExtras && (
               <UploadPreview
@@ -172,10 +210,7 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
                 students={englishExtras.students}
                 rawRows={englishExtras.rawRows}
                 mapping={englishExtras.mapping}
-                onRemapped={handleRemapped(
-                  "english", setEnglishData, setEnglishState, setEnglishExtras,
-                  englishExtras.rawRows, englishExtras.mapping
-                )}
+                onRemapped={handleRemapped(setEnglishData, setEnglishState, setEnglishExtras, englishExtras.rawRows)}
               />
             )}
           </div>
@@ -185,13 +220,13 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
               title="數學成績"
               description="期中考數學科成績"
               onFileSelect={(file) =>
-                handleScoreUpload(file, "math", setMathState, setMathData, setMathExtras)
+                handleScoreUpload(file, "math", setMathState, setMathData, setMathExtras, setMathFileName)
               }
               status={mathState.status}
               fileName={mathState.fileName}
               errorMessage={mathState.errorMessage}
               warnings={mathState.warnings}
-              onClear={() => { setMathData([]); setMathState(defaultFileState); setMathExtras(null); }}
+              onClear={() => clearScore(setMathData, setMathState, setMathExtras, setMathFileName)}
             />
             {mathState.status === "success" && mathExtras && (
               <UploadPreview
@@ -199,10 +234,7 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
                 students={mathExtras.students}
                 rawRows={mathExtras.rawRows}
                 mapping={mathExtras.mapping}
-                onRemapped={handleRemapped(
-                  "math", setMathData, setMathState, setMathExtras,
-                  mathExtras.rawRows, mathExtras.mapping
-                )}
+                onRemapped={handleRemapped(setMathData, setMathState, setMathExtras, mathExtras.rawRows)}
               />
             )}
           </div>
@@ -246,7 +278,11 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
             fileName={currentState.fileName}
             errorMessage={currentState.errorMessage}
             warnings={currentState.warnings}
-            onClear={() => { setCurrentStudents([]); setCurrentState(defaultFileState); }}
+            onClear={() => {
+              setCurrentStudents([]);
+              setCurrentFileName("");
+              setCurrentState(defaultFileState);
+            }}
           />
           <FileUploadCard
             title="特生名單（排除施測）"
@@ -256,7 +292,11 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
             fileName={specialState.fileName}
             errorMessage={specialState.errorMessage}
             warnings={specialState.warnings}
-            onClear={() => { setSpecialStudents([]); setSpecialState(defaultFileState); }}
+            onClear={() => {
+              setSpecialStudents([]);
+              setSpecialFileName("");
+              setSpecialState(defaultFileState);
+            }}
           />
         </div>
         {(currentStudents.length > 0 || specialStudents.length > 0) && (
