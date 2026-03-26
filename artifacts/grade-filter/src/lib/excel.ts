@@ -184,11 +184,87 @@ export interface ColumnMapping {
   colLabels: string[];
 }
 
+export interface DuplicateGroup {
+  idNumber: string;
+  name: string;
+  count: number;
+  rows: number[];
+}
+
+export interface ScoreAnomaly {
+  name: string;
+  score: number;
+  row: number;
+}
+
+export interface GradeScoreStat {
+  grade: number;
+  total: number;
+  missing: number;
+  blankRate: number;
+}
+
 export interface ParseResult {
   students: Student[];
   warnings: string[];
   mapping: ColumnMapping;
   rawRows: string[][];
+  duplicates: DuplicateGroup[];
+  anomalies: ScoreAnomaly[];
+  gradeStats: GradeScoreStat[];
+}
+
+export function detectDuplicates(students: Student[], dataStartRow: number): DuplicateGroup[] {
+  const groups = new Map<string, { name: string; indices: number[] }>();
+  students.forEach((s, i) => {
+    if (!s.idNumber) return;
+    const key = s.idNumber.trim().toUpperCase();
+    if (!groups.has(key)) groups.set(key, { name: s.name, indices: [] });
+    groups.get(key)!.indices.push(dataStartRow + i + 1);
+  });
+  const result: DuplicateGroup[] = [];
+  for (const [idNumber, g] of groups) {
+    if (g.indices.length < 2) continue;
+    result.push({ idNumber, name: g.name, count: g.indices.length, rows: g.indices });
+  }
+  return result;
+}
+
+export function analyzeScoreData(
+  students: Student[],
+  subject: Subject
+): { anomalies: ScoreAnomaly[]; gradeStats: GradeScoreStat[] } {
+  const anomalies: ScoreAnomaly[] = [];
+  const gradeMap = new Map<number, { total: number; missing: number }>();
+
+  students.forEach((s, i) => {
+    const grade = s.grade ?? 0;
+    if (!gradeMap.has(grade)) gradeMap.set(grade, { total: 0, missing: 0 });
+    const stat = gradeMap.get(grade)!;
+    const score = s[subject];
+    if (score === undefined || score === null) {
+      stat.total++;
+      stat.missing++;
+    } else {
+      stat.total++;
+      if ((score as number) < 0 || (score as number) > 150) {
+        anomalies.push({ name: s.name, score: score as number, row: i + 1 });
+      }
+    }
+  });
+
+  const gradeStats: GradeScoreStat[] = [];
+  for (const [grade, stat] of gradeMap) {
+    if (grade === 0) continue;
+    gradeStats.push({
+      grade,
+      total: stat.total,
+      missing: stat.missing,
+      blankRate: stat.total > 0 ? stat.missing / stat.total : 0,
+    });
+  }
+  gradeStats.sort((a, b) => a.grade - b.grade);
+  return { anomalies, gradeStats };
 }
 
 function buildColLabels(rows: string[][], dataStartRow: number): string[] {
@@ -322,7 +398,12 @@ export function parseScoreFile(file: File, subject: Subject): Promise<ParseResul
         const rows: string[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: false });
 
         if (rows.length < 1) {
-          resolve({ students: [], warnings: ["檔案內容為空"], mapping: { nameIdx: -1, gradeIdx: -1, classIdx: -1, seatIdx: -1, idIdx: -1, scoreIdx: -1, gradeFromClass: false, dataStartRow: 0, colLabels: [] }, rawRows: rows });
+          resolve({
+            students: [], warnings: ["檔案內容為空"],
+            mapping: { nameIdx: -1, gradeIdx: -1, classIdx: -1, seatIdx: -1, idIdx: -1, scoreIdx: -1, gradeFromClass: false, dataStartRow: 0, colLabels: [] },
+            rawRows: rows,
+            duplicates: [], anomalies: [], gradeStats: [],
+          });
           return;
         }
 
@@ -334,7 +415,10 @@ export function parseScoreFile(file: File, subject: Subject): Promise<ParseResul
 
         const { mapping, warnings } = resolveMapping(rows, subject, scoreColumnCandidates[subject]);
         const students = buildStudents(rows, mapping, subject);
-        resolve({ students, warnings, mapping, rawRows: rows });
+        const duplicates = detectDuplicates(students, mapping.dataStartRow);
+        const { anomalies, gradeStats } = analyzeScoreData(students, subject);
+
+        resolve({ students, warnings, mapping, rawRows: rows, duplicates, anomalies, gradeStats });
       } catch {
         reject(new Error("無法解析檔案，請確認格式正確"));
       }
