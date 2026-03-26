@@ -91,6 +91,18 @@ Generated Zod schemas from the OpenAPI spec (e.g. `HealthCheckResponse`). Used b
 
 Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHealthCheck`, `healthCheck`).
 
+### `artifacts/grade-filter` (`@workspace/grade-filter`)
+
+成績篩選系統 — React + Vite 純前端應用，所有資料處理在瀏覽器完成（無後端）。
+
+- **功能**：匯入國文/英文/數學各科 Excel 成績，設定篩選條件（百分比或固定人數），自動篩出優先名單
+- **在校生**：上傳在校生名單，篩選後自動列入並標示「優先」
+- **特生排除**：上傳特生名單，依身分證字號比對自動排除
+- **輸出**：支援下載 Excel (.xlsx) 和 CSV 格式，含身分證字號
+- **路由**：`/` (根路徑)
+- **依賴**：SheetJS (xlsx) 用於 Excel 讀寫
+- 三步驟流程：匯入資料 → 設定篩選 → 查看結果
+
 ### `scripts` (`@workspace/scripts`)
 
 Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.
