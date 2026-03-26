@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { Switch, Route, useLocation } from "wouter";
 import { AppProvider, useAppContext } from "./context/AppContext";
 import StepIndicator from "./components/StepIndicator";
 import ImportPage from "./pages/ImportPage";
 import FilterPage from "./pages/FilterPage";
 import ResultPage from "./pages/ResultPage";
+import NotFound from "./pages/not-found";
 import { GraduationCap } from "lucide-react";
 
 const STEPS = [
@@ -12,9 +13,22 @@ const STEPS = [
   { label: "查看結果" },
 ];
 
+const STEP_PATHS = ["/", "/filter", "/result"];
+
 function AppContent() {
-  const [step, setStep] = useState(0);
-  const { clearResults, setChineseData, setEnglishData, setMathData, setCurrentStudents, setSpecialStudents, setFilterConfigs } = useAppContext();
+  const [location, navigate] = useLocation();
+  const {
+    clearResults,
+    setChineseData,
+    setEnglishData,
+    setMathData,
+    setCurrentStudents,
+    setSpecialStudents,
+    setFilterConfigs,
+  } = useAppContext();
+
+  const currentStep = STEP_PATHS.indexOf(location === "" ? "/" : location);
+  const activeStep = currentStep < 0 ? 0 : currentStep;
 
   const handleReset = () => {
     clearResults();
@@ -24,7 +38,7 @@ function AppContent() {
     setCurrentStudents([]);
     setSpecialStudents([]);
     setFilterConfigs([]);
-    setStep(0);
+    navigate("/");
   };
 
   return (
@@ -43,18 +57,27 @@ function AppContent() {
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
         <div className="flex justify-center mb-8">
-          <StepIndicator steps={STEPS} currentStep={step} />
+          <StepIndicator steps={STEPS} currentStep={activeStep} />
         </div>
 
-        {step === 0 && (
-          <ImportPage onNext={() => setStep(1)} />
-        )}
-        {step === 1 && (
-          <FilterPage onPrev={() => setStep(0)} onNext={() => setStep(2)} />
-        )}
-        {step === 2 && (
-          <ResultPage onPrev={() => setStep(1)} onReset={handleReset} />
-        )}
+        <Switch>
+          <Route path="/">
+            <ImportPage onNext={() => navigate("/filter")} />
+          </Route>
+          <Route path="/filter">
+            <FilterPage
+              onPrev={() => navigate("/")}
+              onNext={() => navigate("/result")}
+            />
+          </Route>
+          <Route path="/result">
+            <ResultPage
+              onPrev={() => navigate("/filter")}
+              onReset={handleReset}
+            />
+          </Route>
+          <Route component={NotFound} />
+        </Switch>
       </main>
     </div>
   );
