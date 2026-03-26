@@ -1,5 +1,9 @@
 # Workspace
 
+## 使用者偏好
+
+- **溝通語言**：請全程使用**繁體中文**與使用者溝通，包含所有說明、回覆與提問。
+
 ## Overview
 
 pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
