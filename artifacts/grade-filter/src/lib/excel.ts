@@ -62,6 +62,27 @@ interface ColRates {
   seat: number;
 }
 
+function findMainTableWidth(dataRows: string[][]): number {
+  const numCols = Math.max(...dataRows.map((r) => r.length));
+  const sample = dataRows.slice(0, Math.min(20, dataRows.length));
+  let mainWidth = numCols;
+  let gapStart = -1;
+  for (let c = 0; c < numCols; c++) {
+    const vals = sample.map((r) => String(r[c] ?? "").trim());
+    const emptyRate = vals.filter((v) => !v).length / (vals.length || 1);
+    if (emptyRate > 0.6) {
+      if (gapStart === -1) gapStart = c;
+    } else {
+      if (gapStart !== -1 && c - gapStart >= 2) {
+        mainWidth = gapStart;
+        break;
+      }
+      gapStart = -1;
+    }
+  }
+  return mainWidth;
+}
+
 function detectColumnsByContent(dataRows: string[][]): {
   idxName: number;
   idxGrade: number;
@@ -71,7 +92,7 @@ function detectColumnsByContent(dataRows: string[][]): {
   idxScore: number;
   gradeFromClass: boolean;
 } {
-  const numCols = Math.max(...dataRows.map((r) => r.length));
+  const numCols = findMainTableWidth(dataRows);
   const sample = dataRows.slice(0, Math.min(20, dataRows.length));
 
   const rates: ColRates[] = [];
@@ -156,7 +177,15 @@ function firstRowLooksLikeHeaders(row: string[]): boolean {
     "國文", "英文", "數學", "成績", "分數",
     "chinese", "english", "math", "score",
   ];
-  const cells = row.map((c) => String(c).trim().toLowerCase());
+
+  const leadingCols = row.slice(0, Math.min(6, row.length)).map((c) => String(c).trim());
+
+  const leadingDataCount = leadingCols.filter(
+    (c) => isClassCode(c) || isTaiwanId(c) || isScore(c) || isSmallInt(c)
+  ).length;
+  if (leadingDataCount >= 2) return false;
+
+  const cells = leadingCols.map((c) => c.toLowerCase());
   const matchCount = cells.filter((c) =>
     knownKeywords.some((k) => c.includes(k))
   ).length;
