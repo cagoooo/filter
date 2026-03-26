@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "YDvQLfe3_ckSqTXmAVoqM"
+uri = "file://artifacts/grade-filter/ROADMAP.md"
+type = "text"
+title = "成績篩選系統 開發路線圖"

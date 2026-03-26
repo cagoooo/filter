@@ -130,13 +130,20 @@ Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHea
 - **分班模式**：依年級+班級分組顯示，每班可獨立收起/展開，顯示班級人數摘要徽章
 - **匯出**：Excel (.xlsx) 與 CSV，含身分證字號、三科成績、狀態欄
 
+**資料持久化（IndexedDB）**
+- **自動儲存**：所有成績資料、篩選設定、篩選結果、檔案名稱自動存入瀏覽器本機資料庫
+- **自動還原**：重新整理或隔天開啟，顯示載入畫面後自動還原上次資料
+- **還原提示橫幅**：有資料時頂部顯示藍色提示，含「清除重新開始」連結
+- **右上角清除按鈕**：任意步驟均可一鍵清除所有本機資料
+
 #### 核心元件
 | 檔案 | 說明 |
 |------|------|
 | `src/lib/excel.ts` | Excel 解析、ColumnMapping、remapStudents、匯出 |
+| `src/lib/storage.ts` | IndexedDB 封裝（storageGet / storageSet / storageClear） |
 | `src/components/UploadPreview.tsx` | 欄位辨識預覽 + 手動調整面板 |
 | `src/components/FileUploadCard.tsx` | 上傳區拖曳/點擊卡片 |
-| `src/context/AppContext.tsx` | 全域狀態（成績資料、篩選設定、篩選結果） |
+| `src/context/AppContext.tsx` | 全域狀態 + IndexedDB 自動讀寫 + clearAll |
 | `src/pages/ImportPage.tsx` | 第一步：匯入各科成績 + 輔助名單 |
 | `src/pages/FilterPage.tsx` | 第二步：設定篩選條件（含批次新增） |
 | `src/pages/ResultPage.tsx` | 第三步：結果列表 / 分班顯示 / 匯出 |
