@@ -5,6 +5,7 @@ import { exportToExcel, exportToCsv } from "../lib/excel";
 import {
   ArrowLeft, FileSpreadsheet, FileText, Star, Users,
   ChevronUp, ChevronDown, Search, RefreshCw, UserX, List, LayoutList,
+  TrendingUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +22,7 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
   const [subjectFilter, setSubjectFilter] = useState<Subject | "all">("all");
   const [showExcluded, setShowExcluded] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [showStats, setShowStats] = useState(true);
 
   const grades = useMemo(() => [...new Set(filterResults.map((r) => r.grade))].sort((a, b) => a - b), [filterResults]);
   const subjects = useMemo(() => [...new Set(filterResults.map((r) => r.filterSubject))] as Subject[], [filterResults]);
@@ -106,6 +108,52 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
     return (["chinese", "english", "math"] as Subject[]).filter((s) => map[s] !== undefined).map((s) => ({ subject: s, count: map[s]! }));
   }, [filterResults]);
 
+  // Per-(grade, subject) score stats
+  const scoreStats = useMemo(() => {
+    const map = new Map<string, number[]>();
+    for (const r of activeResults) {
+      const key = `${r.grade}__${r.filterSubject}`;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(r.filterScore);
+    }
+    return [...map.entries()]
+      .map(([key, scores]) => {
+        const [gradeStr, subject] = key.split("__");
+        const sorted = [...scores].sort((a, b) => b - a);
+        const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+        return {
+          grade: Number(gradeStr),
+          subject: subject as Subject,
+          count: scores.length,
+          max: sorted[0],
+          min: sorted[sorted.length - 1],
+          avg: Math.round(avg * 10) / 10,
+          cutoff: sorted[sorted.length - 1],
+        };
+      })
+      .sort((a, b) =>
+        a.grade !== b.grade
+          ? a.grade - b.grade
+          : (["chinese", "english", "math"] as Subject[]).indexOf(a.subject) -
+            (["chinese", "english", "math"] as Subject[]).indexOf(b.subject)
+      );
+  }, [filterResults]);
+
+  // Per-class breakdown
+  const classStats = useMemo(() => {
+    const map = new Map<string, { grade: number; cls: string; count: number; priority: number }>();
+    for (const r of activeResults) {
+      const key = `${r.grade}__${r.class}`;
+      if (!map.has(key)) map.set(key, { grade: r.grade, cls: r.class, count: 0, priority: 0 });
+      const entry = map.get(key)!;
+      entry.count++;
+      if (r.status === "priority") entry.priority++;
+    }
+    return [...map.values()].sort((a, b) =>
+      a.grade !== b.grade ? a.grade - b.grade : String(a.cls).localeCompare(String(b.cls), "zh-TW")
+    );
+  }, [filterResults]);
+
   const TABLE_COLS = [
     { key: "status", label: "狀態" },
     { key: "name", label: "姓名" },
@@ -139,6 +187,112 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
           <p className="text-2xl font-bold text-gray-500 mt-1">{excludedCount}</p>
         </div>
       </div>
+
+      {scoreStats.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <button
+            className="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50/50 transition-colors"
+            onClick={() => setShowStats((v) => !v)}
+          >
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-blue-600" />
+              <span className="text-sm font-semibold text-gray-800">成績統計摘要</span>
+              <span className="text-xs text-gray-400 font-normal">最高 / 最低 / 平均 / 錄取門檻</span>
+            </div>
+            {showStats
+              ? <ChevronUp className="w-4 h-4 text-gray-400" />
+              : <ChevronDown className="w-4 h-4 text-gray-400" />}
+          </button>
+
+          {showStats && (
+            <div className="border-t border-gray-100 overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50/60 border-b border-gray-100">
+                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500">年級</th>
+                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500">科目</th>
+                    <th className="px-4 py-2.5 text-right text-xs font-semibold text-gray-500">人數</th>
+                    <th className="px-4 py-2.5 text-right text-xs font-semibold text-emerald-600">最高分</th>
+                    <th className="px-4 py-2.5 text-right text-xs font-semibold text-rose-500">最低分</th>
+                    <th className="px-4 py-2.5 text-right text-xs font-semibold text-blue-600">平均分</th>
+                    <th className="px-4 py-2.5 text-right text-xs font-semibold text-amber-600">錄取門檻</th>
+                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-400 w-40">分布</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {scoreStats.map(({ grade, subject, count, max, min, avg, cutoff }) => {
+                    const subjectColors: Record<Subject, string> = {
+                      chinese: "text-rose-600 bg-rose-50",
+                      english: "text-blue-600 bg-blue-50",
+                      math: "text-emerald-600 bg-emerald-50",
+                    };
+                    const barColors: Record<Subject, string> = {
+                      chinese: "bg-rose-400",
+                      english: "bg-blue-400",
+                      math: "bg-emerald-400",
+                    };
+                    // Normalize bar: show range as % of 150
+                    const barMin = Math.max(0, min - 5);
+                    const barWidth = Math.round(((max - barMin) / 150) * 100);
+                    const barOffset = Math.round((barMin / 150) * 100);
+                    return (
+                      <tr key={`${grade}-${subject}`} className="border-b border-gray-50 hover:bg-gray-50/40 transition-colors">
+                        <td className="px-4 py-2.5 text-xs text-gray-600 font-medium whitespace-nowrap">
+                          {GRADE_LABELS[grade] || `${grade}年級`}
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <span className={`text-xs font-semibold rounded-full px-2 py-0.5 ${subjectColors[subject]}`}>
+                            {SUBJECT_LABELS[subject]}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-xs font-semibold text-gray-700">{count}</td>
+                        <td className="px-4 py-2.5 text-right text-sm font-bold text-emerald-600">{max}</td>
+                        <td className="px-4 py-2.5 text-right text-sm font-bold text-rose-500">{min}</td>
+                        <td className="px-4 py-2.5 text-right text-sm font-bold text-blue-600">{avg}</td>
+                        <td className="px-4 py-2.5 text-right">
+                          <span className="text-sm font-bold text-amber-600">{cutoff}</span>
+                          <span className="text-xs text-gray-400 ml-1">↑</span>
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <div className="relative h-2 bg-gray-100 rounded-full w-32">
+                            <div
+                              className={`absolute h-2 rounded-full ${barColors[subject]}`}
+                              style={{ left: `${barOffset}%`, width: `${Math.max(barWidth, 4)}%` }}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+
+              {/* Class breakdown */}
+              {classStats.length > 0 && (
+                <div className="border-t border-gray-100 px-5 py-4">
+                  <p className="text-xs font-semibold text-gray-500 mb-3">各班錄取人數</p>
+                  <div className="flex flex-wrap gap-2">
+                    {classStats.map(({ grade, cls, count, priority }) => (
+                      <div
+                        key={`${grade}-${cls}`}
+                        className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5"
+                      >
+                        <span className="text-xs text-gray-500">{GRADE_LABELS[grade]?.replace("年級", "") ?? grade}年{cls}</span>
+                        <span className="text-sm font-bold text-gray-800">{count}</span>
+                        {priority > 0 && (
+                          <span className="text-xs text-amber-600 font-medium">
+                            <Star className="w-2.5 h-2.5 inline fill-amber-500 text-amber-500 mr-0.5" />{priority}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {(gradeStats.length > 0 || subjectStats.length > 0) && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
