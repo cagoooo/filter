@@ -1,4 +1,4 @@
-import { Switch, Route, useLocation } from "wouter";
+import { Switch, Route, Router, useLocation } from "wouter";
 import { AppProvider, useAppContext } from "./context/AppContext";
 import StepIndicator from "./components/StepIndicator";
 import ImportPage from "./pages/ImportPage";
@@ -119,9 +119,13 @@ function AppContent() {
 }
 
 export default function App() {
+  // Strip trailing slash so wouter base works in both dev (/) and prod (/filter/)
+  const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   return (
-    <AppProvider>
-      <AppContent />
-    </AppProvider>
+    <Router base={base}>
+      <AppProvider>
+        <AppContent />
+      </AppProvider>
+    </Router>
   );
 }
