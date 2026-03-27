@@ -1,3 +1,25 @@
 <svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect width="180" height="180" rx="36" fill="#FF3C00"/>
+  <!-- Blue background -->
+  <rect width="180" height="180" rx="38" fill="#2563EB"/>
+
+  <!-- Graduation cap: flat board (diamond) -->
+  <polygon points="90,38 140,64 90,76 40,64" fill="white"/>
+  <!-- Cap underside highlight -->
+  <polygon points="90,76 140,64 140,70 90,82" fill="rgba(255,255,255,0.4)"/>
+
+  <!-- Cap body below board -->
+  <rect x="78" y="74" width="24" height="22" rx="3" fill="white"/>
+
+  <!-- Tassel cord -->
+  <line x1="140" y1="64" x2="140" y2="88" stroke="rgba(255,255,255,0.8)" stroke-width="3" stroke-linecap="round"/>
+  <!-- Tassel end -->
+  <circle cx="140" cy="94" r="6" fill="rgba(255,255,255,0.8)"/>
+
+  <!-- Chart bars (bottom area) -->
+  <rect x="34"  y="122" width="14" height="22" rx="3" fill="rgba(255,255,255,0.40)"/>
+  <rect x="54"  y="114" width="14" height="30" rx="3" fill="rgba(255,255,255,0.55)"/>
+  <rect x="74"  y="106" width="14" height="38" rx="3" fill="rgba(255,255,255,0.85)"/>
+  <rect x="94"  y="112" width="14" height="32" rx="3" fill="rgba(255,255,255,0.70)"/>
+  <rect x="114" y="118" width="14" height="26" rx="3" fill="rgba(255,255,255,0.55)"/>
+  <rect x="134" y="124" width="14" height="20" rx="3" fill="rgba(255,255,255,0.40)"/>
 </svg>
