@@ -1,0 +1,113 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="1200" y2="630" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#1e3a8a"/>
+      <stop offset="100%" stop-color="#1e40af"/>
+    </linearGradient>
+    <linearGradient id="cardGrad" x1="0" y1="0" x2="0" y2="1" gradientUnits="objectBoundingBox">
+      <stop offset="0%"   stop-color="rgba(255,255,255,0.10)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0.03)"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bgGrad)"/>
+
+  <!-- Decorative circles top-right -->
+  <circle cx="1130" cy="-30"  r="260" fill="rgba(255,255,255,0.04)"/>
+  <circle cx="1080" cy="60"   r="180" fill="rgba(255,255,255,0.05)"/>
+  <circle cx="1020" cy="140"  r="100" fill="rgba(255,255,255,0.06)"/>
+
+  <!-- Decorative circles bottom-left -->
+  <circle cx="60"  cy="580"  r="160" fill="rgba(255,255,255,0.03)"/>
+  <circle cx="100" cy="540"  r="80"  fill="rgba(255,255,255,0.04)"/>
+
+  <!-- Left accent line -->
+  <rect x="80" y="175" width="7" height="220" rx="4" fill="#60a5fa"/>
+
+  <!-- Icon box -->
+  <rect x="100" y="180" width="84" height="84" rx="18" fill="#2563EB"/>
+  <!-- Graduation cap inside icon -->
+  <polygon points="142,200 170,214 142,221 114,214" fill="white"/>
+  <rect x="134" y="219" width="16" height="14" rx="2" fill="white"/>
+  <line x1="170" y1="214" x2="170" y2="228" stroke="rgba(255,255,255,0.8)" stroke-width="2.5" stroke-linecap="round"/>
+  <circle cx="170" cy="233" r="4" fill="rgba(255,255,255,0.8)"/>
+  <!-- Mini bars -->
+  <rect x="110" y="244" width="7" height="10" rx="1.5" fill="rgba(255,255,255,0.5)"/>
+  <rect x="120" y="240" width="7" height="14" rx="1.5" fill="rgba(255,255,255,0.7)"/>
+  <rect x="130" y="236" width="7" height="18" rx="1.5" fill="white"/>
+  <rect x="140" y="239" width="7" height="15" rx="1.5" fill="rgba(255,255,255,0.7)"/>
+  <rect x="150" y="243" width="7" height="11" rx="1.5" fill="rgba(255,255,255,0.5)"/>
+
+  <!-- Main title -->
+  <text x="108" y="320"
+    font-family="'PingFang TC','Noto Sans TC','Microsoft JhengHei','Heiti TC',sans-serif"
+    font-size="80" font-weight="700" fill="white" letter-spacing="4">
+    成績篩選系統
+  </text>
+
+  <!-- Subtitle -->
+  <text x="112" y="378"
+    font-family="'PingFang TC','Noto Sans TC','Microsoft JhengHei','Heiti TC',sans-serif"
+    font-size="30" fill="#93c5fd" letter-spacing="2">
+    國小期中考成績篩選工具
+  </text>
+
+  <!-- Divider -->
+  <rect x="108" y="406" width="600" height="2" rx="1" fill="rgba(255,255,255,0.12)"/>
+
+  <!-- Feature badges -->
+  <!-- Badge 1 -->
+  <rect x="108" y="430" width="170" height="52" rx="12" fill="url(#cardGrad)" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+  <text x="193" y="452"
+    font-family="'PingFang TC','Noto Sans TC','Microsoft JhengHei',sans-serif"
+    font-size="13" fill="#93c5fd" text-anchor="middle">STEP 1</text>
+  <text x="193" y="473"
+    font-family="'PingFang TC','Noto Sans TC','Microsoft JhengHei',sans-serif"
+    font-size="18" font-weight="600" fill="white" text-anchor="middle">匯入成績</text>
+
+  <!-- Arrow -->
+  <text x="298" y="460" font-size="22" fill="rgba(255,255,255,0.35)" font-family="sans-serif">›</text>
+
+  <!-- Badge 2 -->
+  <rect x="318" y="430" width="170" height="52" rx="12" fill="url(#cardGrad)" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+  <text x="403" y="452"
+    font-family="'PingFang TC','Noto Sans TC','Microsoft JhengHei',sans-serif"
+    font-size="13" fill="#93c5fd" text-anchor="middle">STEP 2</text>
+  <text x="403" y="473"
+    font-family="'PingFang TC','Noto Sans TC','Microsoft JhengHei',sans-serif"
+    font-size="18" font-weight="600" fill="white" text-anchor="middle">設定篩選</text>
+
+  <!-- Arrow -->
+  <text x="508" y="460" font-size="22" fill="rgba(255,255,255,0.35)" font-family="sans-serif">›</text>
+
+  <!-- Badge 3 -->
+  <rect x="528" y="430" width="170" height="52" rx="12" fill="url(#cardGrad)" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+  <text x="613" y="452"
+    font-family="'PingFang TC','Noto Sans TC','Microsoft JhengHei',sans-serif"
+    font-size="13" fill="#93c5fd" text-anchor="middle">STEP 3</text>
+  <text x="613" y="473"
+    font-family="'PingFang TC','Noto Sans TC','Microsoft JhengHei',sans-serif"
+    font-size="18" font-weight="600" fill="white" text-anchor="middle">查看結果</text>
+
+  <!-- Right side chart decoration -->
+  <rect x="910" y="190" width="22" height="90"  rx="5" fill="rgba(255,255,255,0.12)"/>
+  <rect x="944" y="160" width="22" height="120" rx="5" fill="rgba(255,255,255,0.18)"/>
+  <rect x="978" y="130" width="22" height="150" rx="5" fill="rgba(255,255,255,0.28)"/>
+  <rect x="1012" y="155" width="22" height="125" rx="5" fill="rgba(255,255,255,0.20)"/>
+  <rect x="1046" y="175" width="22" height="105" rx="5" fill="rgba(255,255,255,0.15)"/>
+  <rect x="1080" y="200" width="22" height="80"  rx="5" fill="rgba(255,255,255,0.10)"/>
+
+  <!-- Chart baseline -->
+  <rect x="900" y="280" width="210" height="2" rx="1" fill="rgba(255,255,255,0.15)"/>
+
+  <!-- Highlight bar (tallest) -->
+  <rect x="978" y="130" width="22" height="150" rx="5" fill="#60a5fa" opacity="0.7"/>
+
+  <!-- URL bottom right -->
+  <text x="1120" y="598"
+    font-family="'Courier New', monospace"
+    font-size="20" fill="rgba(255,255,255,0.35)" text-anchor="end">
+    cagoooo.github.io/filter
+  </text>
+</svg>
