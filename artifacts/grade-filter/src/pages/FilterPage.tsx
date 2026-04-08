@@ -229,7 +229,7 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">
-                      {batchMode === "percent" ? "取前幾 %" : "取前幾名"}
+                      {batchMode === "percent" ? "取前幾" : "取前幾名"}
                     </label>
                     <div className="flex items-center gap-2">
                       <input
@@ -367,7 +367,7 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
 
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">
-                        {cfg.mode === "percent" ? "取前幾 %" : "取前幾名"}
+                        {cfg.mode === "percent" ? "取前幾" : "取前幾名"}
                       </label>
                       <div className="flex items-center gap-2">
                         <input
