@@ -61,9 +61,9 @@ export function parseGradeFromClassCode(val: string): { grade: number; className
 
 function pickSheetForSubject(workbook: XLSX.WorkBook, subject: Subject): XLSX.WorkSheet {
   const subjectKeywords: Record<Subject, string[]> = {
-    chinese: ["國文", "中文", "chinese"],
-    english: ["英文", "english"],
-    math: ["數學", "math", "數"],
+    chinese: ["國文", "中文", "chinese", "國語", "語文", "國"],
+    english: ["英文", "english", "英語", "英"],
+    math: ["數學", "math", "數學", "數"],
   };
   const keywords = subjectKeywords[subject];
   const matchedName = workbook.SheetNames.find((name) =>
