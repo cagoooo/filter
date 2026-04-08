@@ -29,12 +29,14 @@ export const GRADE_LABELS: Record<number, string> = {
 };
 
 export type FilterMode = "percent" | "count";
+export type FilterDirection = "top" | "bottom";
 
 export interface FilterConfig {
   grade: number;
   subject: Subject;
   mode: FilterMode;
   value: number;
+  direction?: FilterDirection; // "top" = 高分前幾（預設）, "bottom" = 低分後幾（學習扶助）
 }
 
 export interface FilterResult extends Student {

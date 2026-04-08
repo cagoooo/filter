@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useAppContext } from "../context/AppContext";
-import { FilterConfig, Subject, SUBJECT_LABELS, GRADE_LABELS } from "../types";
+import { FilterConfig, FilterDirection, Subject, SUBJECT_LABELS, GRADE_LABELS } from "../types";
 import { Plus, Trash2, ArrowLeft, Play, Settings2, ChevronDown, ChevronUp, Layers, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -67,6 +67,7 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
   const [batchExpanded, setBatchExpanded] = useState(false);
   const [batchSubject, setBatchSubject] = useState<Subject>("chinese");
   const [batchMode, setBatchMode] = useState<"percent" | "count">("percent");
+  const [batchDirection, setBatchDirection] = useState<FilterDirection>("top");
   const [batchValue, setBatchValue] = useState<number>(20);
   const [batchGrades, setBatchGrades] = useState<Set<number>>(new Set(GRADES));
 
@@ -96,7 +97,7 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
       if (!batchGrades.has(g)) continue;
       const exists = configs.some((c) => c.grade === g && c.subject === batchSubject);
       if (!exists) {
-        newConfigs.push({ grade: g, subject: batchSubject, mode: batchMode, value: batchValue });
+        newConfigs.push({ grade: g, subject: batchSubject, mode: batchMode, value: batchValue, direction: batchDirection });
       }
     }
     if (newConfigs.length > 0) {
@@ -108,7 +109,7 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
     if (batchGrades.size === 0) return;
     const filtered = configs.filter((c) => !(batchGrades.has(c.grade) && c.subject === batchSubject));
     const newConfigs: FilterConfig[] = GRADES.filter((g) => batchGrades.has(g)).map((g) => ({
-      grade: g, subject: batchSubject, mode: batchMode, value: batchValue,
+      grade: g, subject: batchSubject, mode: batchMode, value: batchValue, direction: batchDirection,
     }));
     setConfigs([...filtered, ...newConfigs].sort((a, b) => a.grade - b.grade || SUBJECTS.indexOf(a.subject) - SUBJECTS.indexOf(b.subject)));
   };
@@ -228,8 +229,21 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                      {batchMode === "percent" ? "取前幾" : "取前幾名"}
+                    <label className="flex items-center gap-1 text-xs font-medium text-gray-600 mb-1">
+                      取
+                      <button
+                        type="button"
+                        onClick={() => setBatchDirection((d) => d === "top" ? "bottom" : "top")}
+                        className={cn(
+                          "px-1.5 py-0.5 rounded text-xs font-bold border transition-colors",
+                          batchDirection === "bottom"
+                            ? "bg-orange-100 text-orange-700 border-orange-300"
+                            : "bg-blue-100 text-blue-700 border-blue-200"
+                        )}
+                      >
+                        {batchDirection === "bottom" ? "後" : "前"}
+                      </button>
+                      <span>幾{batchMode === "percent" ? "" : "名"}</span>
                     </label>
                     <div className="flex items-center gap-2">
                       <input
@@ -366,8 +380,21 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
-                        {cfg.mode === "percent" ? "取前幾" : "取前幾名"}
+                      <label className="flex items-center gap-1 text-xs font-medium text-gray-600 mb-1">
+                        取
+                        <button
+                          type="button"
+                          onClick={() => updateConfig(i, { direction: cfg.direction === "bottom" ? "top" : "bottom" })}
+                          className={cn(
+                            "px-1.5 py-0.5 rounded text-xs font-bold border transition-colors",
+                            cfg.direction === "bottom"
+                              ? "bg-orange-100 text-orange-700 border-orange-300"
+                              : "bg-blue-100 text-blue-700 border-blue-200"
+                          )}
+                        >
+                          {cfg.direction === "bottom" ? "後" : "前"}
+                        </button>
+                        <span>幾{cfg.mode === "percent" ? "" : "名"}</span>
                       </label>
                       <div className="flex items-center gap-2">
                         <input
@@ -407,7 +434,9 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
                   ) : (
                     <span className="text-xs text-gray-500">
                       {GRADE_LABELS[cfg.grade]}{SUBJECT_LABELS[cfg.subject]}共 {gradeCount} 人 →
-                      <span className="font-semibold text-blue-600 ml-1">篩出約 {count} 人</span>
+                      <span className={cn("font-semibold ml-1", cfg.direction === "bottom" ? "text-orange-600" : "text-blue-600")}>
+                        篩出約 {count} 人{cfg.direction === "bottom" ? "（低分學習扶助）" : ""}
+                      </span>
                     </span>
                   )}
                 </div>
