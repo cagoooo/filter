@@ -200,10 +200,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const gradeData = data.filter((s) => s.grade === config.grade);
       const nonSpecial = gradeData.filter((s) => !specialIdSet.has(s.idNumber.trim()));
 
+      const isBottom = config.direction === "bottom";
       const sorted = [...nonSpecial].sort((a, b) => {
         const scoreA = a[config.subject] ?? 0;
         const scoreB = b[config.subject] ?? 0;
-        return scoreB - scoreA;
+        return isBottom ? scoreA - scoreB : scoreB - scoreA; // bottom = 低分在前
       });
 
       let cutCount: number;
