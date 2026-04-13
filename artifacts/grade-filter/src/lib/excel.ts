@@ -428,6 +428,63 @@ export function parseScoreFile(file: File, subject: Subject): Promise<ParseResul
   });
 }
 
+function parseListSheetRows(rows: string[][], globalOffset: number): Student[] {
+  if (rows.length < 2) return [];
+  const hasContent = rows.slice(0, 5).some((r) => r.some((c) => c && String(c).trim()));
+  if (!hasContent) return [];
+
+  let nameIdx = -1, gradeIdx = -1, classIdx = -1, seatIdx = -1, idIdx = -1;
+  let gradeFromClass = false, dataStartRow: number;
+
+  if (firstRowLooksLikeHeaders(rows[0])) {
+    dataStartRow = 1;
+    const rh = rows[0].map(String);
+    nameIdx = findColumn(rh, ["姓名", "name"]);
+    let gradeIdxH = findColumn(rh, ["年級", "grade"]);
+    const classIdxH = findColumn(rh, ["班級", "class", "班"]);
+    seatIdx = findColumn(rh, ["座號", "seat"]);
+    let idIdxH = findColumn(rh, ["身分證字號", "身份證字號", "身分證", "身份證", "證照號碼", "id", "idnumber"]);
+    if (gradeIdxH === -1 && classIdxH !== -1 && classColIsClassCode(rows, 1, classIdxH)) {
+      gradeIdxH = classIdxH; gradeFromClass = true;
+    }
+    if (idIdxH === -1) {
+      const exc = [nameIdx, gradeIdxH, classIdxH, seatIdx].filter((x) => x !== -1);
+      idIdxH = detectIdByContent(rows, 1, exc);
+    }
+    gradeIdx = gradeIdxH; classIdx = classIdxH; idIdx = idIdxH;
+  } else {
+    dataStartRow = 0;
+    const d = detectByContent(rows);
+    nameIdx = d.idxName; gradeIdx = d.idxGrade; classIdx = d.idxClass;
+    seatIdx = d.idxSeat; idIdx = d.idxId; gradeFromClass = d.gradeFromClass;
+  }
+
+  const students: Student[] = [];
+  for (let i = dataStartRow; i < rows.length; i++) {
+    const row = rows[i];
+    if (row.every((c) => !c || String(c).trim() === "")) continue;
+    const name = nameIdx !== -1 ? String(row[nameIdx] ?? "").trim() : "";
+    const idNumber = idIdx !== -1 ? String(row[idIdx] ?? "").trim() : "";
+    const classRaw = classIdx !== -1 ? String(row[classIdx] ?? "").trim() : "";
+    const seatNo = seatIdx !== -1 ? String(row[seatIdx] ?? "").trim() : "";
+    let grade: number; let className: string;
+    if (gradeFromClass && gradeIdx !== -1) {
+      const p = parseGradeFromClassCode(String(row[gradeIdx] ?? "").trim());
+      grade = p.grade; className = p.className;
+    } else if (gradeIdx !== -1) {
+      grade = parseInt(String(row[gradeIdx] ?? "").trim().replace(/[^0-9]/g, ""), 10);
+      className = classRaw;
+    } else { grade = 0; className = classRaw; }
+    if (!idNumber && !name) continue;
+    students.push({
+      id: generateId(name, idNumber, globalOffset + i),
+      studentId: seatNo || String(globalOffset + i),
+      name, grade: isNaN(grade) ? 0 : grade, class: className, seatNo, idNumber,
+    });
+  }
+  return students;
+}
+
 export function parseListFile(file: File): Promise<{ students: Student[]; warnings: string[] }> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -435,65 +492,24 @@ export function parseListFile(file: File): Promise<{ students: Student[]; warnin
       try {
         const data = new Uint8Array(e.target!.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: "array" });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const rows: string[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: false });
 
-        if (rows.length < 1) { resolve({ students: [], warnings: ["檔案內容為空"] }); return; }
-
+        const allStudents: Student[] = [];
         const warnings: string[] = [];
-        let nameIdx: number; let gradeIdx: number; let classIdx: number;
-        let seatIdx: number; let idIdx: number; let gradeFromClass = false;
-        let dataStartRow: number;
+        let globalOffset = 0;
 
-        if (firstRowLooksLikeHeaders(rows[0])) {
-          dataStartRow = 1;
-          const rh = rows[0].map(String);
-          nameIdx = findColumn(rh, ["姓名", "name"]);
-          let gradeIdxH = findColumn(rh, ["年級", "grade"]);
-          const classIdxH = findColumn(rh, ["班級", "class", "班"]);
-          seatIdx = findColumn(rh, ["座號", "seat"]);
-          let idIdxH = findColumn(rh, ["身分證字號", "身份證字號", "身分證", "身份證", "證照號碼", "id", "idnumber"]);
-          if (gradeIdxH === -1 && classIdxH !== -1 && classColIsClassCode(rows, 1, classIdxH)) {
-            gradeIdxH = classIdxH; gradeFromClass = true;
-          }
-          if (idIdxH === -1) {
-            const exc = [nameIdx, gradeIdxH, classIdxH, seatIdx].filter((x) => x !== -1);
-            idIdxH = detectIdByContent(rows, 1, exc);
-          }
-          gradeIdx = gradeIdxH; classIdx = classIdxH; idIdx = idIdxH;
-          if (idIdx === -1) warnings.push("找不到「身分證字號」欄位");
-          if (nameIdx === -1) warnings.push("找不到「姓名」欄位");
-          if (gradeFromClass) warnings.push("年級已從班級代碼自動辨識");
-        } else {
-          dataStartRow = 0;
-          const d = detectByContent(rows);
-          nameIdx = d.idxName; gradeIdx = d.idxGrade; classIdx = d.idxClass;
-          seatIdx = d.idxSeat; idIdx = d.idxId; gradeFromClass = d.gradeFromClass;
-          if (gradeFromClass) warnings.push("年級已從班級代碼自動辨識（例：203 → 2年級3班）");
-          if (idIdx === -1) warnings.push("找不到「身分證字號」欄位，請確認格式");
+        for (const sheetName of workbook.SheetNames) {
+          const sheet = workbook.Sheets[sheetName];
+          const rows: string[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: false });
+          const students = parseListSheetRows(rows, globalOffset);
+          allStudents.push(...students);
+          globalOffset += rows.length;
         }
 
-        const students: Student[] = [];
-        for (let i = dataStartRow; i < rows.length; i++) {
-          const row = rows[i];
-          if (row.every((c) => !c || String(c).trim() === "")) continue;
-          const name = nameIdx !== -1 ? String(row[nameIdx] ?? "").trim() : "";
-          const idNumber = idIdx !== -1 ? String(row[idIdx] ?? "").trim() : "";
-          const classRaw = classIdx !== -1 ? String(row[classIdx] ?? "").trim() : "";
-          const seatNo = seatIdx !== -1 ? String(row[seatIdx] ?? "").trim() : "";
-          let grade: number; let className: string;
-          if (gradeFromClass && gradeIdx !== -1) {
-            const p = parseGradeFromClassCode(String(row[gradeIdx] ?? "").trim());
-            grade = p.grade; className = p.className;
-          } else if (gradeIdx !== -1) {
-            grade = parseInt(String(row[gradeIdx] ?? "").trim().replace(/[^0-9]/g, ""), 10);
-            className = classRaw;
-          } else { grade = 0; className = classRaw; }
-          if (!idNumber && !name) continue;
-          students.push({ id: generateId(name, idNumber, i), studentId: seatNo || String(i), name, grade: isNaN(grade) ? 0 : grade, class: className, seatNo, idNumber });
+        if (allStudents.length === 0) {
+          warnings.push("檔案內容為空或無法辨識欄位");
         }
 
-        resolve({ students, warnings });
+        resolve({ students: allStudents, warnings });
       } catch { reject(new Error("無法解析檔案")); }
     };
     reader.onerror = () => reject(new Error("讀取檔案失敗"));
