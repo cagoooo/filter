@@ -1,11 +1,12 @@
 import { useState, useMemo } from "react";
 import { useAppContext } from "../context/AppContext";
 import { FilterConfig, FilterDirection, Subject, SUBJECT_LABELS, GRADE_LABELS } from "../types";
-import { Plus, Trash2, ArrowLeft, Play, Settings2, ChevronDown, ChevronUp, Layers, AlertTriangle, FolderOpen } from "lucide-react";
+import { Plus, Trash2, ArrowLeft, Play, Settings2, ChevronDown, ChevronUp, Layers, AlertTriangle, FolderOpen, Undo2, Redo2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { FilterTemplateDialog } from "../components/FilterTemplateDialog";
 import { useKeyboardShortcuts } from "../hooks/use-keyboard-shortcuts";
+import { useHistoryState } from "../hooks/use-history-state";
 
 const GRADES = [1, 2, 3, 4, 5, 6];
 const SUBJECTS: Subject[] = ["chinese", "english", "math"];
@@ -50,7 +51,15 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
     math: mathData.length,
   };
 
-  const [configs, setConfigs] = useState<FilterConfig[]>(
+  const {
+    value: configs,
+    set: setConfigs,
+    commit: commitConfigs,
+    undo: undoConfigs,
+    redo: redoConfigs,
+    canUndo,
+    canRedo,
+  } = useHistoryState<FilterConfig[]>(
     filterConfigs.length > 0
       ? filterConfigs
       : [{ grade: 1, subject: "chinese", mode: "percent", value: 20 }]
@@ -77,14 +86,30 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
 
   useKeyboardShortcuts({
     onRerun: () => handleRun(),
+    onUndo: () => {
+      if (canUndo) {
+        undoConfigs();
+        toast("已撤銷上一步", { duration: 1500 });
+      }
+    },
+    onRedo: () => {
+      if (canRedo) {
+        redoConfigs();
+        toast("已還原", { duration: 1500 });
+      }
+    },
   });
 
   const addConfig = () => {
+    commitConfigs();
     setConfigs([...configs, { grade: 1, subject: "chinese", mode: "percent", value: 20 }]);
+    commitConfigs();
   };
 
   const removeConfig = (i: number) => {
+    commitConfigs();
     setConfigs(configs.filter((_, idx) => idx !== i));
+    commitConfigs();
   };
 
   const updateConfig = (i: number, patch: Partial<FilterConfig>) => {
@@ -109,7 +134,9 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
       }
     }
     if (newConfigs.length > 0) {
+      commitConfigs();
       setConfigs([...configs, ...newConfigs]);
+      commitConfigs();
     }
   };
 
@@ -119,7 +146,9 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
     const newConfigs: FilterConfig[] = GRADES.filter((g) => batchGrades.has(g)).map((g) => ({
       grade: g, subject: batchSubject, mode: batchMode, value: batchValue, direction: batchDirection,
     }));
+    commitConfigs();
     setConfigs([...filtered, ...newConfigs].sort((a, b) => a.grade - b.grade || SUBJECTS.indexOf(a.subject) - SUBJECTS.indexOf(b.subject)));
+    commitConfigs();
   };
 
   const toggleBatchGrade = (g: number) => {
@@ -140,7 +169,9 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
   };
 
   const handleApplyTemplate = (tplConfigs: FilterConfig[]) => {
+    commitConfigs();
     setConfigs(tplConfigs);
+    commitConfigs();
   };
 
   return (
@@ -151,14 +182,34 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
           <h2 className="text-lg font-bold text-gray-900">設定篩選條件</h2>
           <p className="text-xs text-gray-500 mt-0.5">設定各年級、各科的篩選規則</p>
         </div>
-        <button
-          onClick={() => setTemplateDialogOpen(true)}
-          className="flex items-center gap-1.5 px-3 py-2 text-sm bg-white border border-gray-300 text-gray-700 rounded-lg hover:border-blue-400 hover:text-blue-600 transition-colors"
-          title="管理篩選條件範本"
-        >
-          <FolderOpen className="w-4 h-4" />
-          範本
-        </button>
+        <div className="flex items-center gap-2">
+          <div className="flex rounded-lg overflow-hidden border border-gray-300 bg-white">
+            <button
+              onClick={undoConfigs}
+              disabled={!canUndo}
+              className="flex items-center gap-1 px-2.5 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              title="撤銷 (Ctrl/⌘+Z)"
+            >
+              <Undo2 className="w-4 h-4" />
+            </button>
+            <button
+              onClick={redoConfigs}
+              disabled={!canRedo}
+              className="flex items-center gap-1 px-2.5 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors border-l border-gray-300"
+              title="還原 (Ctrl/⌘+Shift+Z)"
+            >
+              <Redo2 className="w-4 h-4" />
+            </button>
+          </div>
+          <button
+            onClick={() => setTemplateDialogOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm bg-white border border-gray-300 text-gray-700 rounded-lg hover:border-blue-400 hover:text-blue-600 transition-colors"
+            title="管理篩選條件範本"
+          >
+            <FolderOpen className="w-4 h-4" />
+            範本
+          </button>
+        </div>
       </div>
 
       <FilterTemplateDialog

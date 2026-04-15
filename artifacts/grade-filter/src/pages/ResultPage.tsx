@@ -5,19 +5,21 @@ import { exportToExcel, exportToCsv } from "../lib/excel";
 import {
   ArrowLeft, FileSpreadsheet, FileText, Star, Users,
   ChevronUp, ChevronDown, Search, RefreshCw, UserX, List, LayoutList,
-  TrendingUp, Printer,
+  TrendingUp, Printer, Camera,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useKeyboardShortcuts } from "../hooks/use-keyboard-shortcuts";
 import ScoreDistributionChart from "../components/ScoreDistributionChart";
+import { FilterSnapshotDialog } from "../components/FilterSnapshotDialog";
 
 type SortKey = keyof FilterResult | "none";
 type SortDir = "asc" | "desc";
 type ViewMode = "list" | "grouped";
 
 export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; onReset: () => void }) {
-  const { filterResults } = useAppContext();
+  const { filterResults, filterConfigs } = useAppContext();
+  const [snapshotOpen, setSnapshotOpen] = useState(false);
 
   const handleExport = () => {
     if (filterResults.length === 0) {
@@ -475,6 +477,14 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
               <Printer className="w-4 h-4" />
               列印
             </button>
+            <button
+              onClick={() => setSnapshotOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:border-indigo-400 hover:text-indigo-600 transition-colors no-print"
+              title="快照與比較"
+            >
+              <Camera className="w-4 h-4" />
+              快照
+            </button>
           </div>
         </div>
 
@@ -534,6 +544,13 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
           重新開始
         </button>
       </div>
+
+      <FilterSnapshotDialog
+        open={snapshotOpen}
+        onClose={() => setSnapshotOpen(false)}
+        currentConfigs={filterConfigs}
+        currentResults={filterResults}
+      />
     </div>
   );
 }

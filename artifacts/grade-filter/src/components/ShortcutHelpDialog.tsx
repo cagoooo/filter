@@ -8,6 +8,8 @@ const SHORTCUTS: { keys: string[]; desc: string }[] = [
   { keys: ["Ctrl/⌘", "P"], desc: "列印結果（於結果頁）" },
   { keys: ["Ctrl/⌘", "F"], desc: "聚焦搜尋框" },
   { keys: ["Ctrl", "Shift", "R"], desc: "重新執行篩選" },
+  { keys: ["Ctrl/⌘", "Z"], desc: "撤銷（於篩選設定頁）" },
+  { keys: ["Ctrl/⌘", "Shift", "Z"], desc: "還原（於篩選設定頁）" },
   { keys: ["?"], desc: "顯示此快捷鍵說明" },
 ];
 
