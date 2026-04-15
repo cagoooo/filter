@@ -443,6 +443,102 @@ export function parseScoreBuffer(buffer: ArrayBuffer, subject: Subject): ParseRe
   return { students, warnings, mapping, rawRows: rows, duplicates, anomalies, gradeStats };
 }
 
+export interface MultiSubjectParseResult {
+  /** Per-subject parsed students (score filled only for that subject). */
+  students: Record<Subject, Student[]>;
+  /** Which subjects were detected in the file */
+  detectedSubjects: Subject[];
+  warnings: string[];
+  /** Union of all raw rows for debugging / remap UI (not currently used for re-map) */
+  rawRows: string[][];
+}
+
+/**
+ * Detect and parse a single Excel file that contains score columns for
+ * multiple subjects at once (e.g. columns 國文 / 英文 / 數學 all on one sheet).
+ *
+ * Strategy:
+ * 1. Read the first sheet.
+ * 2. Detect columns by header keywords for each subject.
+ * 3. For every subject that has a detected score column, build a dedicated
+ *    Student[] using the existing buildStudents() with scoreIdx pointed at
+ *    that column. This reuses all of the identifier/grade/class detection
+ *    that single-subject parsing relies on.
+ */
+export function parseMultiSubjectBuffer(buffer: ArrayBuffer): MultiSubjectParseResult {
+  const data = new Uint8Array(buffer);
+  const workbook = XLSX.read(data, { type: "array" });
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const rows: string[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: false });
+
+  const empty: MultiSubjectParseResult = {
+    students: { chinese: [], english: [], math: [] },
+    detectedSubjects: [],
+    warnings: ["檔案內容為空"],
+    rawRows: rows,
+  };
+  if (rows.length < 1) return empty;
+
+  const warnings: string[] = [];
+  const hasHeaders = firstRowLooksLikeHeaders(rows[0]);
+  const rawHeaders = hasHeaders ? rows[0].map(String) : [];
+  const dataStartRow = hasHeaders ? 1 : 0;
+
+  const subjectKeywords: Record<Subject, string[]> = {
+    chinese: ["國文", "chinese", "中文", "國語"],
+    english: ["英文", "english", "英語"],
+    math: ["數學", "math"],
+  };
+
+  // Detect score column per subject (header-based only — content-based detection
+  // can't distinguish between three score columns anyway).
+  const scoreIdxBySubject: Record<Subject, number> = { chinese: -1, english: -1, math: -1 };
+  if (hasHeaders) {
+    for (const subj of ["chinese", "english", "math"] as Subject[]) {
+      scoreIdxBySubject[subj] = findColumn(rawHeaders, subjectKeywords[subj]);
+    }
+  }
+
+  const detected: Subject[] = (["chinese", "english", "math"] as Subject[]).filter(
+    (s) => scoreIdxBySubject[s] !== -1
+  );
+  if (detected.length === 0) {
+    warnings.push(
+      "合併檔案必須有表頭，並包含「國文」「英文」「數學」至少一欄才能辨識（可在標題列明寫：姓名、班級、身分證字號、國文成績、英文成績、數學成績）"
+    );
+    return { ...empty, warnings, rawRows: rows };
+  }
+
+  // Build a base mapping once, reusing resolveMapping for the first detected subject
+  // (it picks name/id/grade/class by header or content; those don't change per subject).
+  const baseCandidates = subjectKeywords[detected[0]];
+  const { mapping: baseMapping, warnings: baseWarnings } = resolveMapping(rows, detected[0], baseCandidates);
+  warnings.push(...baseWarnings);
+
+  const students: Record<Subject, Student[]> = { chinese: [], english: [], math: [] };
+  for (const subj of detected) {
+    const mapping: ColumnMapping = { ...baseMapping, scoreIdx: scoreIdxBySubject[subj] };
+    students[subj] = buildStudents(rows, mapping, subj);
+  }
+
+  return { students, detectedSubjects: detected, warnings, rawRows: rows };
+}
+
+export function parseMultiSubjectFile(file: File): Promise<MultiSubjectParseResult> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        resolve(parseMultiSubjectBuffer(e.target!.result as ArrayBuffer));
+      } catch {
+        reject(new Error("無法解析檔案，請確認格式正確"));
+      }
+    };
+    reader.onerror = () => reject(new Error("讀取檔案失敗"));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
 export function parseScoreFile(file: File, subject: Subject): Promise<ParseResult> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

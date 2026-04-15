@@ -4,7 +4,16 @@
  * - 大檔案自動使用 Web Worker，避免 UI 凍結
  * - Worker 若初始化失敗會自動 fallback 到主執行緒
  */
-import { parseScoreFile, parseListFile, parseScoreBuffer, parseListBuffer, ParseResult } from "./excel";
+import {
+  parseScoreFile,
+  parseListFile,
+  parseScoreBuffer,
+  parseListBuffer,
+  parseMultiSubjectFile,
+  parseMultiSubjectBuffer,
+  ParseResult,
+  MultiSubjectParseResult,
+} from "./excel";
 import { Subject, Student } from "../types";
 
 const WORKER_THRESHOLD = 500 * 1024; // 500 KB
@@ -32,7 +41,11 @@ function readFileAsArrayBuffer(file: File): Promise<ArrayBuffer> {
   });
 }
 
-function sendToWorker<T>(request: { kind: "score"; buffer: ArrayBuffer; subject: Subject } | { kind: "list"; buffer: ArrayBuffer }): Promise<T> {
+function sendToWorker<T>(request:
+  | { kind: "score"; buffer: ArrayBuffer; subject: Subject }
+  | { kind: "list"; buffer: ArrayBuffer }
+  | { kind: "multi"; buffer: ArrayBuffer }
+): Promise<T> {
   return new Promise((resolve, reject) => {
     const worker = getWorker();
     if (!worker) {
@@ -73,6 +86,22 @@ export async function parseScoreFileAsync(
     // Fallback 主執行緒
     const buffer = await readFileAsArrayBuffer(file);
     return parseScoreBuffer(buffer, subject);
+  }
+}
+
+export async function parseMultiSubjectFileAsync(
+  file: File
+): Promise<MultiSubjectParseResult> {
+  if (file.size < WORKER_THRESHOLD) {
+    return parseMultiSubjectFile(file);
+  }
+  try {
+    const buffer = await readFileAsArrayBuffer(file);
+    return await sendToWorker<MultiSubjectParseResult>({ kind: "multi", buffer });
+  } catch (err) {
+    console.warn("[excel-client] Worker 失敗，fallback 主執行緒", err);
+    const buffer = await readFileAsArrayBuffer(file);
+    return parseMultiSubjectBuffer(buffer);
   }
 }
 
