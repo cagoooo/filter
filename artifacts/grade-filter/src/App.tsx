@@ -10,16 +10,12 @@ import NotFound from "./pages/not-found";
 import { GraduationCap, RotateCcw, X, Keyboard } from "lucide-react";
 import { useState } from "react";
 import { Toaster } from "sonner";
+import { useTranslation } from "react-i18next";
 import { useKeyboardShortcuts } from "./hooks/use-keyboard-shortcuts";
 import { useDocumentTitle } from "./hooks/use-document-title";
 import { AppBootSkeleton } from "./components/Skeleton";
 import { PWAUpdatePrompt } from "./components/PWAUpdatePrompt";
-
-const STEPS = [
-  { label: "匯入資料" },
-  { label: "設定篩選" },
-  { label: "查看結果" },
-];
+import { LanguageSwitcher } from "./components/LanguageSwitcher";
 
 const STEP_PATHS = ["/", "/filter", "/result"];
 
@@ -28,6 +24,14 @@ function AppContent() {
   const { isLoading, hasRestoredData, clearAll } = useUIContext();
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
+  const { t } = useTranslation();
+
+  // P3.5：步驟標籤改為動態取自 i18n，切換語言即時生效
+  const steps = [
+    { label: t("steps.import") },
+    { label: t("steps.filter") },
+    { label: t("steps.result") },
+  ];
 
   useDocumentTitle();
   useKeyboardShortcuts({
@@ -61,24 +65,25 @@ function AppContent() {
             <GraduationCap className="w-5 h-5 text-white" />
           </div>
           <div className="flex-1">
-            <h1 className="text-lg font-bold text-gray-900">成績篩選系統</h1>
-            <p className="text-xs text-gray-500">國小期中考成績篩選工具</p>
+            <h1 className="text-lg font-bold text-gray-900">{t("app.title")}</h1>
+            <p className="text-xs text-gray-500">{t("app.subtitle")}</p>
           </div>
+          <LanguageSwitcher />
           <button
             onClick={() => setShortcutHelpOpen(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-transparent hover:border-blue-200"
-            title="鍵盤快捷鍵 (按 ? 鍵)"
+            title={t("actions.shortcutsTitle")}
           >
             <Keyboard className="w-4 h-4" />
-            <span className="hidden md:inline">快捷鍵</span>
+            <span className="hidden md:inline">{t("actions.shortcuts")}</span>
           </button>
           <button
             onClick={handleReset}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-200"
-            title="清除所有資料，重新開始"
+            title={t("actions.resetTitle")}
           >
             <RotateCcw className="w-4 h-4" />
-            <span className="hidden sm:inline">清除資料</span>
+            <span className="hidden sm:inline">{t("actions.reset")}</span>
           </button>
         </div>
       </header>
@@ -87,12 +92,12 @@ function AppContent() {
         <div className="bg-blue-600 text-white">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 py-2.5 flex items-center justify-between gap-3">
             <p className="text-sm">
-              上次的資料已自動還原，可直接繼續操作。
+              {t("banner.restored")}
               <button
                 onClick={handleReset}
                 className="underline ml-2 hover:text-blue-200 transition-colors"
               >
-                清除資料，重新開始
+                {t("banner.restart")}
               </button>
             </p>
             <button
@@ -107,7 +112,7 @@ function AppContent() {
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
         <div className="flex justify-center mb-8">
-          <StepIndicator steps={STEPS} currentStep={activeStep} />
+          <StepIndicator steps={steps} currentStep={activeStep} />
         </div>
 
         <ErrorBoundary>

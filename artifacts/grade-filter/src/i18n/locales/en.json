@@ -1,0 +1,58 @@
+{
+  "app": {
+    "title": "Grade Filter",
+    "subtitle": "Elementary school exam score filtering tool"
+  },
+  "steps": {
+    "import": "Import Data",
+    "filter": "Configure Filter",
+    "result": "View Results"
+  },
+  "actions": {
+    "reset": "Clear Data",
+    "resetTitle": "Clear all data and start over",
+    "shortcuts": "Shortcuts",
+    "shortcutsTitle": "Keyboard shortcuts (press ?)",
+    "close": "Close",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "save": "Save",
+    "delete": "Delete",
+    "apply": "Apply",
+    "prev": "Back",
+    "next": "Next",
+    "run": "Run Filter",
+    "exportExcel": "Export Excel",
+    "exportCsv": "Export CSV",
+    "print": "Print",
+    "snapshot": "Save Snapshot"
+  },
+  "banner": {
+    "restored": "Previous data has been restored automatically. You can continue where you left off.",
+    "restart": "Clear data and start over"
+  },
+  "subjects": {
+    "chinese": "Chinese",
+    "english": "English",
+    "math": "Math"
+  },
+  "grades": {
+    "g1": "Grade 1",
+    "g2": "Grade 2",
+    "g3": "Grade 3",
+    "g4": "Grade 4",
+    "g5": "Grade 5",
+    "g6": "Grade 6"
+  },
+  "status": {
+    "priority": "Priority",
+    "normal": "Normal",
+    "excluded": "Excluded",
+    "virtualized": "Virtual scrolling enabled"
+  },
+  "language": {
+    "label": "Language",
+    "zhTW": "繁體中文",
+    "en": "English"
+  }
+}
