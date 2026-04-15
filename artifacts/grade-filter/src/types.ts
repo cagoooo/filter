@@ -44,3 +44,21 @@ export interface FilterResult extends Student {
   filterSubject: Subject;
   filterScore: number;
 }
+
+export interface FilterTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  configs: FilterConfig[];
+  createdAt: number;
+  lastUsedAt?: number;
+}
+
+export interface FilterSnapshot {
+  id: string;
+  label: string;
+  note?: string;
+  configs: FilterConfig[];
+  results: FilterResult[];
+  createdAt: number;
+}

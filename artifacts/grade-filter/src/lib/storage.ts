@@ -71,4 +71,7 @@ export const STORAGE_KEYS = {
   MATH_FILENAME: "mathFileName",
   CURRENT_FILENAME: "currentFileName",
   SPECIAL_FILENAME: "specialFileName",
+  FILTER_TEMPLATES: "filterTemplates",
+  FILTER_SNAPSHOTS: "filterSnapshots",
+  EXCEL_PROFILES: "excelProfiles",
 } as const;

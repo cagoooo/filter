@@ -1,8 +1,11 @@
 import { useState, useMemo } from "react";
 import { useAppContext } from "../context/AppContext";
 import { FilterConfig, FilterDirection, Subject, SUBJECT_LABELS, GRADE_LABELS } from "../types";
-import { Plus, Trash2, ArrowLeft, Play, Settings2, ChevronDown, ChevronUp, Layers, AlertTriangle } from "lucide-react";
+import { Plus, Trash2, ArrowLeft, Play, Settings2, ChevronDown, ChevronUp, Layers, AlertTriangle, FolderOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import { FilterTemplateDialog } from "../components/FilterTemplateDialog";
+import { useKeyboardShortcuts } from "../hooks/use-keyboard-shortcuts";
 
 const GRADES = [1, 2, 3, 4, 5, 6];
 const SUBJECTS: Subject[] = ["chinese", "english", "math"];
@@ -70,6 +73,11 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
   const [batchDirection, setBatchDirection] = useState<FilterDirection>("top");
   const [batchValue, setBatchValue] = useState<number>(20);
   const [batchGrades, setBatchGrades] = useState<Set<number>>(new Set(GRADES));
+  const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
+
+  useKeyboardShortcuts({
+    onRerun: () => handleRun(),
+  });
 
   const addConfig = () => {
     setConfigs([...configs, { grade: 1, subject: "chinese", mode: "percent", value: 20 }]);
@@ -121,13 +129,44 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
   };
 
   const handleRun = () => {
+    if (configs.length === 0) {
+      toast.error("請先新增篩選條件");
+      return;
+    }
     setFilterConfigs(configs);
     runFilter(configs);
+    toast.success(`已執行篩選（${configs.length} 筆條件）`);
     onNext();
+  };
+
+  const handleApplyTemplate = (tplConfigs: FilterConfig[]) => {
+    setConfigs(tplConfigs);
   };
 
   return (
     <div className="space-y-6">
+
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-gray-900">設定篩選條件</h2>
+          <p className="text-xs text-gray-500 mt-0.5">設定各年級、各科的篩選規則</p>
+        </div>
+        <button
+          onClick={() => setTemplateDialogOpen(true)}
+          className="flex items-center gap-1.5 px-3 py-2 text-sm bg-white border border-gray-300 text-gray-700 rounded-lg hover:border-blue-400 hover:text-blue-600 transition-colors"
+          title="管理篩選條件範本"
+        >
+          <FolderOpen className="w-4 h-4" />
+          範本
+        </button>
+      </div>
+
+      <FilterTemplateDialog
+        open={templateDialogOpen}
+        onClose={() => setTemplateDialogOpen(false)}
+        currentConfigs={configs}
+        onApply={handleApplyTemplate}
+      />
 
       {idMismatches.length > 0 && (
         <div className="rounded-xl border border-red-300 bg-red-50 overflow-hidden">
