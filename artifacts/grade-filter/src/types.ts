@@ -62,3 +62,27 @@ export interface FilterSnapshot {
   results: FilterResult[];
   createdAt: number;
 }
+
+/**
+ * Excel 欄位對應 Profile —— 可將一次成功的欄位辨識結果命名保存，
+ * 下次匯入同樣格式的檔案時一鍵套用，免除重複調整欄位的工作。
+ */
+export interface ExcelProfile {
+  id: string;
+  name: string;
+  /** 欄位索引對應（-1 表示未選）*/
+  mapping: {
+    nameIdx: number;
+    gradeIdx: number;
+    classIdx: number;
+    seatIdx: number;
+    idIdx: number;
+    scoreIdx: number;
+    gradeFromClass: boolean;
+    dataStartRow: number;
+  };
+  /** 建立時的表頭字串，幫助使用者辨識 profile 適用格式 */
+  headerSignature: string[];
+  createdAt: number;
+  lastUsedAt?: number;
+}

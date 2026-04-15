@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   ChevronDown, ChevronUp, RefreshCw, CheckCircle, AlertCircle,
-  AlertTriangle, BarChart2, Copy,
+  AlertTriangle, BarChart2, Copy, Save, Trash2, Sparkles,
 } from "lucide-react";
-import { Subject, SUBJECT_LABELS, Student } from "../types";
+import { Subject, SUBJECT_LABELS, Student, ExcelProfile } from "../types";
 import { ColumnMapping, remapStudents, DuplicateGroup, ScoreAnomaly, GradeScoreStat } from "../lib/excel";
+import { storageGet, storageSet, STORAGE_KEYS } from "../lib/storage";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -42,6 +44,17 @@ export default function UploadPreview({
   const [localMapping, setLocalMapping] = useState<ColumnMapping>(mapping);
   const [remapWarnings, setRemapWarnings] = useState<string[]>([]);
   const [dupResolved, setDupResolved] = useState(false);
+  const [profiles, setProfiles] = useState<ExcelProfile[]>([]);
+  const [newProfileName, setNewProfileName] = useState("");
+  const [profileFormOpen, setProfileFormOpen] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const list = (await storageGet<ExcelProfile[]>(STORAGE_KEYS.EXCEL_PROFILES)) ?? [];
+      list.sort((a, b) => (b.lastUsedAt ?? b.createdAt) - (a.lastUsedAt ?? a.createdAt));
+      setProfiles(list);
+    })();
+  }, []);
 
   const colLabels = mapping.colLabels;
   const preview = students.slice(0, 3);
@@ -50,7 +63,21 @@ export default function UploadPreview({
   const hasAnomalies = anomalies.length > 0;
   const highBlankGrades = gradeStats.filter((g) => g.blankRate > 0.3);
 
-  const alertCount = (hasDuplicates ? 1 : 0) + (hasAnomalies ? 1 : 0) + (highBlankGrades.length > 0 ? 1 : 0);
+  // P2.1: 關鍵欄位置信度低 → 提醒使用者檢查
+  const CRITICAL_FIELDS: (keyof typeof FIELD_LABELS)[] = ["nameIdx", "idIdx", "scoreIdx"];
+  const lowConfidenceFields = CRITICAL_FIELDS.filter((f) => {
+    const idx = mapping[f];
+    if (idx === -1) return false;
+    const c = mapping.confidence?.[f] ?? 1;
+    return c < 0.6;
+  });
+  const hasLowConfidence = lowConfidenceFields.length > 0;
+
+  const alertCount =
+    (hasDuplicates ? 1 : 0) +
+    (hasAnomalies ? 1 : 0) +
+    (highBlankGrades.length > 0 ? 1 : 0) +
+    (hasLowConfidence ? 1 : 0);
 
   const handleRemap = () => {
     const { students: newStudents, warnings } = remapStudents(rawRows, localMapping, subject);
@@ -80,10 +107,107 @@ export default function UploadPreview({
     setLocalMapping((prev) => ({ ...prev, [field]: val }));
   };
 
+  const saveProfile = async () => {
+    if (!newProfileName.trim()) {
+      toast.error("請輸入 Profile 名稱");
+      return;
+    }
+    const prof: ExcelProfile = {
+      id: `prof-${Date.now()}`,
+      name: newProfileName.trim(),
+      mapping: {
+        nameIdx: localMapping.nameIdx,
+        gradeIdx: localMapping.gradeIdx,
+        classIdx: localMapping.classIdx,
+        seatIdx: localMapping.seatIdx,
+        idIdx: localMapping.idIdx,
+        scoreIdx: localMapping.scoreIdx,
+        gradeFromClass: localMapping.gradeFromClass,
+        dataStartRow: localMapping.dataStartRow,
+      },
+      headerSignature: colLabels.slice(0, 12).map((s) => String(s ?? "")),
+      createdAt: Date.now(),
+    };
+    const next = [prof, ...profiles];
+    await storageSet(STORAGE_KEYS.EXCEL_PROFILES, next);
+    setProfiles(next);
+    setNewProfileName("");
+    setProfileFormOpen(false);
+    toast.success(`已儲存欄位 Profile「${prof.name}」`);
+  };
+
+  const applyProfile = async (profileId: string) => {
+    const prof = profiles.find((p) => p.id === profileId);
+    if (!prof) return;
+    const { mapping: pm } = prof;
+    const newLocal: ColumnMapping = {
+      ...localMapping,
+      nameIdx: pm.nameIdx,
+      gradeIdx: pm.gradeIdx,
+      classIdx: pm.classIdx,
+      seatIdx: pm.seatIdx,
+      idIdx: pm.idIdx,
+      scoreIdx: pm.scoreIdx,
+      gradeFromClass: pm.gradeFromClass,
+    };
+    setLocalMapping(newLocal);
+    // Immediately re-run parsing with this mapping
+    const { students: newStudents, warnings } = remapStudents(rawRows, newLocal, subject);
+    setRemapWarnings(warnings);
+    onRemapped(newStudents, warnings, newLocal);
+    // Update lastUsedAt
+    const next = profiles.map((p) => (p.id === profileId ? { ...p, lastUsedAt: Date.now() } : p));
+    await storageSet(STORAGE_KEYS.EXCEL_PROFILES, next);
+    setProfiles(next);
+    toast.success(`已套用 Profile「${prof.name}」`);
+  };
+
+  const deleteProfile = async (profileId: string) => {
+    const prof = profiles.find((p) => p.id === profileId);
+    if (!prof) return;
+    if (!confirm(`確定刪除 Profile「${prof.name}」？`)) return;
+    const next = profiles.filter((p) => p.id !== profileId);
+    await storageSet(STORAGE_KEYS.EXCEL_PROFILES, next);
+    setProfiles(next);
+    toast.success("已刪除");
+  };
+
   const colOptions = [
     { value: -1, label: "（未選取）" },
     ...colLabels.map((label, i) => ({ value: i, label: `第${i + 1}欄 「${label.slice(0, 8)}」` })),
   ];
+
+  /** 依據置信度挑選顏色。>= 0.85 綠、>= 0.60 黃、其他 橘（低置信但有偵測）*/
+  const confidenceStyle = (conf: number | undefined): {
+    bg: string;
+    icon: React.ReactNode;
+    tierLabel: string;
+    tierColor: string;
+  } => {
+    const c = conf ?? 0;
+    if (c >= 0.85) {
+      return {
+        bg: "bg-green-50 text-green-700 border-green-200",
+        icon: <CheckCircle className="w-3 h-3" />,
+        tierLabel: "高",
+        tierColor: "bg-green-100 text-green-700",
+      };
+    }
+    if (c >= 0.6) {
+      return {
+        bg: "bg-amber-50 text-amber-800 border-amber-200",
+        icon: <AlertTriangle className="w-3 h-3" />,
+        tierLabel: "中",
+        tierColor: "bg-amber-100 text-amber-700",
+      };
+    }
+    return {
+      bg: "bg-orange-50 text-orange-800 border-orange-200",
+      icon: <AlertTriangle className="w-3 h-3" />,
+      tierLabel: "低",
+      tierColor: "bg-orange-100 text-orange-700",
+    };
+  };
 
   const fieldBadge = (
     field: keyof Pick<ColumnMapping, "nameIdx" | "gradeIdx" | "classIdx" | "seatIdx" | "idIdx" | "scoreIdx">,
@@ -91,17 +215,19 @@ export default function UploadPreview({
     idx: number,
   ) => {
     const found = idx !== -1;
+    const conf = mapping.confidence?.[field];
+    const style = confidenceStyle(conf);
+    const confPct = conf ? Math.round(conf * 100) : 0;
     return (
       <span
         key={field}
         className={cn(
           "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border",
-          found
-            ? "bg-green-50 text-green-700 border-green-200"
-            : "bg-red-50 text-red-600 border-red-200"
+          found ? style.bg : "bg-red-50 text-red-600 border-red-200"
         )}
+        title={found ? `置信度：${confPct}% (${style.tierLabel})` : "未偵測到"}
       >
-        {found ? <CheckCircle className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+        {found ? style.icon : <AlertCircle className="w-3 h-3" />}
         {label}
         {found && (
           <span className="text-xs opacity-70">
@@ -109,6 +235,11 @@ export default function UploadPreview({
             {field === "gradeIdx" && mapping.gradeFromClass
               ? `${colLabels[idx] ?? `第${idx + 1}欄`}（班級代碼）`
               : colLabels[idx] ?? `第${idx + 1}欄`}
+          </span>
+        )}
+        {found && conf !== undefined && (
+          <span className={cn("ml-1 rounded px-1 py-0.5 text-[10px] font-bold", style.tierColor)}>
+            {confPct}%
           </span>
         )}
         {!found && <span className="opacity-70">: 未偵測到</span>}
@@ -136,6 +267,32 @@ export default function UploadPreview({
 
       {expanded && (
         <div className="px-4 pb-4 space-y-4">
+
+          {hasLowConfidence && (
+            <div className="rounded-lg border border-orange-300 bg-orange-50 p-3">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-orange-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-orange-800">
+                    部分欄位偵測置信度偏低（可能誤判），建議人工核對
+                  </p>
+                  <ul className="mt-1 text-xs text-orange-700 space-y-0.5">
+                    {lowConfidenceFields.map((f) => {
+                      const c = mapping.confidence?.[f] ?? 0;
+                      return (
+                        <li key={f}>
+                          • {FIELD_LABELS[f]}：置信度 {Math.round(c * 100)}%
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  <p className="mt-1 text-xs text-orange-600 italic">
+                    可使用下方「手動調整欄位對應」確認。
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {hasDuplicates && !dupResolved && (
             <div className="rounded-lg border border-amber-300 bg-amber-50 p-3">
@@ -258,6 +415,89 @@ export default function UploadPreview({
 
             {manualExpanded && (
               <div className="bg-white rounded-lg border border-gray-200 p-3 space-y-3">
+                {/* P2.2: Excel 欄位 Profile 管理 */}
+                <div className="rounded-md border border-violet-200 bg-violet-50/60 p-2.5">
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-violet-600" />
+                      <span className="text-xs font-semibold text-violet-800">
+                        欄位對應 Profile（{profiles.length}）
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setProfileFormOpen((p) => !p)}
+                      className="flex items-center gap-1 text-xs text-violet-700 hover:text-violet-900 font-medium"
+                    >
+                      <Save className="w-3 h-3" />
+                      {profileFormOpen ? "取消" : "儲存目前設定"}
+                    </button>
+                  </div>
+
+                  {profileFormOpen && (
+                    <div className="flex items-center gap-2 mb-2">
+                      <input
+                        type="text"
+                        value={newProfileName}
+                        onChange={(e) => setNewProfileName(e.target.value)}
+                        placeholder="例如：校務系統匯出格式"
+                        className="flex-1 text-xs border border-violet-200 rounded-md px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            saveProfile();
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={saveProfile}
+                        className="px-3 py-1.5 bg-violet-600 text-white text-xs font-medium rounded-md hover:bg-violet-700 transition-colors"
+                      >
+                        儲存
+                      </button>
+                    </div>
+                  )}
+
+                  {profiles.length === 0 ? (
+                    <p className="text-xs text-violet-600/80 italic">
+                      尚未儲存任何 Profile。調整欄位對應後，可命名儲存以供下次匯入同格式檔案時一鍵套用。
+                    </p>
+                  ) : (
+                    <div className="space-y-1">
+                      {profiles.map((p) => (
+                        <div
+                          key={p.id}
+                          className="flex items-center gap-2 px-2 py-1.5 bg-white rounded border border-violet-100"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium text-gray-800 truncate">{p.name}</p>
+                            <p className="text-[10px] text-gray-500 truncate" title={p.headerSignature.join(" | ")}>
+                              表頭：{p.headerSignature.filter(Boolean).slice(0, 4).join("、") || "（無）"}
+                              {p.lastUsedAt && ` · 最近使用：${new Date(p.lastUsedAt).toLocaleDateString()}`}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => applyProfile(p.id)}
+                            className="px-2 py-1 text-[11px] font-medium text-violet-700 border border-violet-300 rounded hover:bg-violet-100 transition-colors whitespace-nowrap"
+                          >
+                            套用
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteProfile(p.id)}
+                            className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                            title="刪除 Profile"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {REQUIRED_FIELDS.map((field) => (
                     <div key={field}>
