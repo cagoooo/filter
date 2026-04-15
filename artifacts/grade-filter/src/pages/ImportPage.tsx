@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAppContext } from "../context/AppContext";
-import { parseScoreFile, parseListFile, ColumnMapping, DuplicateGroup, ScoreAnomaly, GradeScoreStat } from "../lib/excel";
+import { ColumnMapping, DuplicateGroup, ScoreAnomaly, GradeScoreStat } from "../lib/excel";
+import { parseScoreFileAsync as parseScoreFile, parseListFileAsync as parseListFile } from "../lib/excel-client";
 import FileUploadCard from "../components/FileUploadCard";
 import UploadPreview from "../components/UploadPreview";
 import { Student, Subject } from "../types";
@@ -97,7 +98,7 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
   const handleScoreUpload = async (
     file: File,
     subject: Subject,
-    setState: (s: FileState) => void,
+    setState: React.Dispatch<React.SetStateAction<FileState>>,
     setData: (d: Student[]) => void,
     setExtras: (e: ScoreFileExtras | null) => void,
     setFileName: (name: string) => void
@@ -141,7 +142,7 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
 
   const handleRemapped = (
     setData: (d: Student[]) => void,
-    setState: (s: FileState) => void,
+    setState: React.Dispatch<React.SetStateAction<FileState>>,
     setExtras: (e: ScoreFileExtras | null) => void,
     extras: ScoreFileExtras
   ) => (students: Student[], warnings: string[], newMapping: ColumnMapping) => {
@@ -187,7 +188,7 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
 
   const clearScore = (
     setData: (d: Student[]) => void,
-    setState: (s: FileState) => void,
+    setState: React.Dispatch<React.SetStateAction<FileState>>,
     setExtras: (e: ScoreFileExtras | null) => void,
     setFileName: (name: string) => void
   ) => {
