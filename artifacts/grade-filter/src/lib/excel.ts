@@ -19,6 +19,27 @@ function findColumn(headers: string[], candidates: string[]): number {
   return -1;
 }
 
+/**
+ * 同 findColumn，但額外回傳置信度：
+ * - 精準匹配（正規化後相等） → 0.95
+ * - 子字串匹配 → 0.80
+ * - 未找到 → 0
+ */
+function findColumnWithConfidence(
+  headers: string[],
+  candidates: string[]
+): { idx: number; confidence: number } {
+  for (const candidate of candidates) {
+    const exactIdx = headers.findIndex((h) => normalizeHeader(h) === candidate);
+    if (exactIdx !== -1) return { idx: exactIdx, confidence: 0.95 };
+  }
+  for (const candidate of candidates) {
+    const partialIdx = headers.findIndex((h) => h.includes(candidate));
+    if (partialIdx !== -1) return { idx: partialIdx, confidence: 0.8 };
+  }
+  return { idx: -1, confidence: 0 };
+}
+
 const TAIWAN_ID_RE = /^[A-Za-z][12]\d{8}$/;
 const CLASS_CODE_RE = /^[1-6]\d{2}$/;
 
@@ -125,6 +146,7 @@ interface ColRates {
 function detectByContent(dataRows: string[][]): {
   idxName: number; idxGrade: number; idxClass: number;
   idxSeat: number; idxId: number; idxScore: number; gradeFromClass: boolean;
+  confidence: ConfidenceMap;
 } {
   const numCols = findMainTableWidth(dataRows);
   const sample = dataRows.slice(0, Math.min(20, dataRows.length));
@@ -141,25 +163,37 @@ function detectByContent(dataRows: string[][]): {
       seat: vals.filter(isSmallInt).length / total,
     };
   }
-  const best = (key: keyof ColRates, exclude: number[] = [], thr = 0.3): number => {
+  const best = (key: keyof ColRates, exclude: number[] = [], thr = 0.3): { idx: number; rate: number } => {
     let b = -1; let bv = thr;
     for (let c = 0; c < numCols; c++) {
       if (exclude.includes(c)) continue;
       if (rates[c][key] > bv) { bv = rates[c][key]; b = c; }
     }
-    return b;
+    return { idx: b, rate: b === -1 ? 0 : rates[b][key] };
   };
-  const idxId = best("id");
-  const idxClassCode = best("classCode", idxId !== -1 ? [idxId] : []);
-  const idxName = best("name", [idxId, idxClassCode].filter((x) => x !== -1));
-  const exc = [idxId, idxClassCode, idxName].filter((x) => x !== -1);
-  const idxScore = best("score", exc);
-  const idxSeat = best("seat", [...exc, idxScore].filter((x) => x !== -1));
-  const idxGradeOnly = best("grade", [...exc, idxScore, idxSeat].filter((x) => x !== -1));
-  let idxGrade = -1; let gradeFromClass = false;
-  if (idxGradeOnly !== -1) { idxGrade = idxGradeOnly; }
-  else if (idxClassCode !== -1) { idxGrade = idxClassCode; gradeFromClass = true; }
-  return { idxName, idxGrade, idxClass: idxClassCode, idxSeat, idxId, idxScore, gradeFromClass };
+  const rId = best("id");
+  const rClassCode = best("classCode", rId.idx !== -1 ? [rId.idx] : []);
+  const rName = best("name", [rId.idx, rClassCode.idx].filter((x) => x !== -1));
+  const exc = [rId.idx, rClassCode.idx, rName.idx].filter((x) => x !== -1);
+  const rScore = best("score", exc);
+  const rSeat = best("seat", [...exc, rScore.idx].filter((x) => x !== -1));
+  const rGradeOnly = best("grade", [...exc, rScore.idx, rSeat.idx].filter((x) => x !== -1));
+  let idxGrade = -1; let gradeFromClass = false; let gradeConf = 0;
+  if (rGradeOnly.idx !== -1) { idxGrade = rGradeOnly.idx; gradeConf = rGradeOnly.rate; }
+  else if (rClassCode.idx !== -1) { idxGrade = rClassCode.idx; gradeFromClass = true; gradeConf = rClassCode.rate; }
+  const confidence: ConfidenceMap = {
+    idIdx: rId.rate,
+    classIdx: rClassCode.rate,
+    nameIdx: rName.rate,
+    scoreIdx: rScore.rate,
+    seatIdx: rSeat.rate,
+    gradeIdx: gradeConf,
+  };
+  return {
+    idxName: rName.idx, idxGrade, idxClass: rClassCode.idx,
+    idxSeat: rSeat.idx, idxId: rId.idx, idxScore: rScore.idx,
+    gradeFromClass, confidence,
+  };
 }
 
 function detectIdByContent(dataRows: string[][], startRow: number, exclude: number[]): number {
@@ -196,6 +230,9 @@ function firstRowLooksLikeHeaders(row: string[]): boolean {
   return cells.filter((c) => keywords.some((k) => c.includes(k))).length >= 2;
 }
 
+export type ConfidenceField = "nameIdx" | "gradeIdx" | "classIdx" | "seatIdx" | "idIdx" | "scoreIdx";
+export type ConfidenceMap = Partial<Record<ConfidenceField, number>>;
+
 export interface ColumnMapping {
   nameIdx: number;
   gradeIdx: number;
@@ -206,6 +243,11 @@ export interface ColumnMapping {
   gradeFromClass: boolean;
   dataStartRow: number;
   colLabels: string[];
+  /**
+   * 偵測置信度（0.0–1.0）。header 精準匹配 ≈ 0.95，含關鍵字 ≈ 0.80，
+   * 內容匹配直接使用樣本中命中率（例：0.67 表示 67% 樣本符合該欄位特徵）。
+   */
+  confidence?: ConfidenceMap;
 }
 
 export interface DuplicateGroup {
@@ -312,21 +354,33 @@ function resolveMapping(
 
   if (firstRowLooksLikeHeaders(rows[0])) {
     const rawHeaders = rows[0].map(String);
-    let nameIdx = findColumn(rawHeaders, ["姓名", "name"]);
-    let gradeIdx = findColumn(rawHeaders, ["年級", "grade"]);
-    const classIdx = findColumn(rawHeaders, ["班級", "class", "班"]);
-    const seatIdx = findColumn(rawHeaders, ["座號", "seat", "號碼"]);
-    let idIdx = findColumn(rawHeaders, ["身分證字號", "身份證字號", "身分證", "身份證", "證照號碼", "id", "idnumber"]);
-    let scoreIdx = findColumn(rawHeaders, scoreCandidates);
-    if (scoreIdx === -1) scoreIdx = findColumn(rawHeaders, ["分數", "成績", "score"]);
+    const nameR = findColumnWithConfidence(rawHeaders, ["姓名", "name"]);
+    const gradeR = findColumnWithConfidence(rawHeaders, ["年級", "grade"]);
+    const classR = findColumnWithConfidence(rawHeaders, ["班級", "class", "班"]);
+    const seatR = findColumnWithConfidence(rawHeaders, ["座號", "seat", "號碼"]);
+    const idR = findColumnWithConfidence(rawHeaders, ["身分證字號", "身份證字號", "身分證", "身份證", "證照號碼", "id", "idnumber"]);
+    let scoreR = findColumnWithConfidence(rawHeaders, scoreCandidates);
+    if (scoreR.idx === -1) scoreR = findColumnWithConfidence(rawHeaders, ["分數", "成績", "score"]);
+
+    let nameIdx = nameR.idx;
+    let gradeIdx = gradeR.idx;
+    const classIdx = classR.idx;
+    const seatIdx = seatR.idx;
+    let idIdx = idR.idx;
+    const scoreIdx = scoreR.idx;
 
     let gradeFromClass = false;
+    let gradeConf = gradeR.confidence;
     if (gradeIdx === -1 && classIdx !== -1 && classColIsClassCode(rows, 1, classIdx)) {
-      gradeIdx = classIdx; gradeFromClass = true;
+      gradeIdx = classIdx;
+      gradeFromClass = true;
+      gradeConf = Math.max(0.7, classR.confidence);
     }
+    let idConf = idR.confidence;
     if (idIdx === -1) {
       const exc = [nameIdx, gradeIdx, classIdx, seatIdx, scoreIdx].filter((x) => x !== -1);
       idIdx = detectIdByContent(rows, 1, exc);
+      if (idIdx !== -1) idConf = 0.7; // content-based fallback
     }
 
     if (nameIdx === -1) warnings.push("找不到「姓名」欄位");
@@ -339,6 +393,14 @@ function resolveMapping(
       nameIdx, gradeIdx, classIdx, seatIdx, idIdx, scoreIdx,
       gradeFromClass, dataStartRow: 1,
       colLabels: buildColLabels(rows, 1),
+      confidence: {
+        nameIdx: nameR.confidence,
+        gradeIdx: gradeConf,
+        classIdx: classR.confidence,
+        seatIdx: seatR.confidence,
+        idIdx: idConf,
+        scoreIdx: scoreR.confidence,
+      },
     };
   } else {
     const d = detectByContent(rows);
@@ -352,6 +414,7 @@ function resolveMapping(
       seatIdx: d.idxSeat, idIdx: d.idxId, scoreIdx: d.idxScore,
       gradeFromClass: d.gradeFromClass, dataStartRow: 0,
       colLabels: buildColLabels(rows, 0),
+      confidence: d.confidence,
     };
   }
 
