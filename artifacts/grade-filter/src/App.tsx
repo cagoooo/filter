@@ -1,5 +1,5 @@
 import { Switch, Route, Router, useLocation } from "wouter";
-import { AppProvider, useAppContext } from "./context/AppContext";
+import { AppProvider, useUIContext } from "./context/AppContext";
 import StepIndicator from "./components/StepIndicator";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ShortcutHelpDialog } from "./components/ShortcutHelpDialog";
@@ -24,7 +24,7 @@ const STEP_PATHS = ["/", "/filter", "/result"];
 
 function AppContent() {
   const [location, navigate] = useLocation();
-  const { isLoading, hasRestoredData, clearAll } = useAppContext();
+  const { isLoading, hasRestoredData, clearAll } = useUIContext();
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
 

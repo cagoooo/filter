@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useAppContext } from "../context/AppContext";
+import { useFilterContext } from "../context/AppContext";
 import { FilterResult, Subject, SUBJECT_LABELS, GRADE_LABELS } from "../types";
 import { exportToExcel, exportToCsv } from "../lib/excel";
 import {
@@ -23,7 +23,7 @@ type SortDir = "asc" | "desc";
 type ViewMode = "list" | "grouped";
 
 export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; onReset: () => void }) {
-  const { filterResults, filterConfigs } = useAppContext();
+  const { filterResults, filterConfigs } = useFilterContext();
   const [snapshotOpen, setSnapshotOpen] = useState(false);
   const isMobile = useIsMobile();
 
