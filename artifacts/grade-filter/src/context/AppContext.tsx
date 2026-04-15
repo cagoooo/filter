@@ -25,8 +25,9 @@ import {
   useCallback,
   ReactNode,
 } from "react";
-import { Student, FilterConfig, FilterResult, Subject } from "../types";
+import { Student, FilterConfig, FilterResult } from "../types";
 import { storageGet, storageSet, storageClear, STORAGE_KEYS } from "../lib/storage";
+import { runFilterPure } from "../lib/filter";
 
 // ───────────────────── 切片型別 ─────────────────────
 
@@ -156,132 +157,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => { if (didLoad.current) storageSet(STORAGE_KEYS.CURRENT_FILENAME, currentFileName); }, [currentFileName]);
   useEffect(() => { if (didLoad.current) storageSet(STORAGE_KEYS.SPECIAL_FILENAME, specialFileName); }, [specialFileName]);
 
-  // ── 篩選引擎 ──
+  // ── 篩選引擎（純函式於 lib/filter.ts，此處僅負責接入 React state）──
   const runFilter = useCallback(
     (configs?: FilterConfig[]) => {
       const activeConfigs = configs ?? filterConfigs;
-      const allResults: FilterResult[] = [];
-      const resultIdSet = new Set<string>();
-
-      const nid = (s: string) => s.trim().toUpperCase();
-
-      const specialIdSet = new Set(specialStudents.map((s) => nid(s.idNumber)));
-      const currentIdSet = new Set(currentStudents.map((s) => nid(s.idNumber)));
-
-      const allDataBySubject: Record<Subject, Student[]> = {
-        chinese: chineseData,
-        english: englishData,
-        math: mathData,
-      };
-      const idMaps: Record<Subject, Map<string, Student>> = {
-        chinese: new Map(),
-        english: new Map(),
-        math: new Map(),
-      };
-      for (const subj of ["chinese", "english", "math"] as Subject[]) {
-        for (const s of allDataBySubject[subj]) {
-          const key = nid(s.idNumber);
-          if (key) idMaps[subj].set(key, s);
-        }
-      }
-
-      const findScoreStudent = (idNumber: string): Student | undefined => {
-        const key = nid(idNumber);
-        for (const subj of ["chinese", "english", "math"] as Subject[]) {
-          const found = idMaps[subj].get(key);
-          if (found) return found;
-        }
-        return undefined;
-      };
-
-      const enrichScores = (idNumber: string): Partial<Record<Subject, number>> => {
-        const key = nid(idNumber);
-        const scores: Partial<Record<Subject, number>> = {};
-        for (const subj of ["chinese", "english", "math"] as Subject[]) {
-          const match = idMaps[subj].get(key);
-          if (match && match[subj] !== undefined) {
-            scores[subj] = match[subj] as number;
-          }
-        }
-        return scores;
-      };
-
-      const addResult = (
-        s: Student,
-        status: "priority" | "normal" | "excluded",
-        subject: Subject,
-        score: number,
-        rowId: string,
-      ) => {
-        if (resultIdSet.has(rowId)) return;
-        resultIdSet.add(rowId);
-        const scoreStudent = findScoreStudent(s.idNumber);
-        const base = scoreStudent ?? s;
-        allResults.push({
-          ...base,
-          ...enrichScores(s.idNumber),
-          id: rowId,
-          status,
-          filterSubject: subject,
-          filterScore: score,
-        });
-      };
-
-      const getSubjectData = (subject: Subject) =>
-        subject === "chinese" ? chineseData : subject === "english" ? englishData : mathData;
-
-      for (const config of activeConfigs) {
-        const data = getSubjectData(config.subject);
-        const gradeData = data.filter((s) => s.grade === config.grade);
-        const nonSpecial = gradeData.filter((s) => !specialIdSet.has(nid(s.idNumber)));
-
-        const isBottom = config.direction === "bottom";
-        const sorted = [...nonSpecial].sort((a, b) => {
-          const scoreA = a[config.subject] ?? 0;
-          const scoreB = b[config.subject] ?? 0;
-          return isBottom ? scoreA - scoreB : scoreB - scoreA;
-        });
-
-        let cutCount: number;
-        if (config.mode === "percent") {
-          cutCount = Math.ceil((config.value / 100) * sorted.length);
-        } else {
-          cutCount = Math.min(config.value, sorted.length);
-        }
-
-        const selected = sorted.slice(0, cutCount);
-        const selectedIdSet = new Set(selected.map((s) => nid(s.idNumber)));
-
-        for (const s of selected) {
-          const score = s[config.subject] ?? 0;
-          const isPriority = currentIdSet.has(nid(s.idNumber));
-          const rowId = `${nid(s.idNumber)}-${config.subject}`;
-          addResult(s, isPriority ? "priority" : "normal", config.subject, score, rowId);
-        }
-
-        const extraPriority = currentStudents.filter(
-          (s) =>
-            s.grade === config.grade &&
-            !specialIdSet.has(nid(s.idNumber)) &&
-            !selectedIdSet.has(nid(s.idNumber)),
-        );
-        for (const s of extraPriority) {
-          const scoreMatch = idMaps[config.subject]?.get(nid(s.idNumber));
-          const score = scoreMatch?.[config.subject] ?? 0;
-          const rowId = `${nid(s.idNumber)}-${config.subject}`;
-          addResult(s, "priority", config.subject, score as number, rowId);
-        }
-
-        const specialInConfig = specialStudents.filter((s) => s.grade === config.grade);
-        for (const s of specialInConfig) {
-          const scoreMatch = idMaps[config.subject]?.get(nid(s.idNumber));
-          const score = scoreMatch?.[config.subject] ?? 0;
-          const rowId = `excluded-${nid(s.idNumber)}-${config.subject}`;
-          addResult(s, "excluded", config.subject, score as number, rowId);
-        }
-      }
-
-      setFilterResults(allResults);
+      const results = runFilterPure({
+        chineseData,
+        englishData,
+        mathData,
+        currentStudents,
+        specialStudents,
+        configs: activeConfigs,
+      });
+      setFilterResults(results);
     },
     [chineseData, englishData, mathData, currentStudents, specialStudents, filterConfigs],
   );
