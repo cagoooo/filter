@@ -7,11 +7,12 @@ import ImportPage from "./pages/ImportPage";
 import FilterPage from "./pages/FilterPage";
 import ResultPage from "./pages/ResultPage";
 import NotFound from "./pages/not-found";
-import { GraduationCap, Loader2, RotateCcw, X, Keyboard } from "lucide-react";
+import { GraduationCap, RotateCcw, X, Keyboard } from "lucide-react";
 import { useState } from "react";
 import { Toaster } from "sonner";
 import { useKeyboardShortcuts } from "./hooks/use-keyboard-shortcuts";
 import { useDocumentTitle } from "./hooks/use-document-title";
+import { AppBootSkeleton } from "./components/Skeleton";
 
 const STEPS = [
   { label: "匯入資料" },
@@ -46,17 +47,7 @@ function AppContent() {
   };
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center mx-auto mb-4">
-            <GraduationCap className="w-6 h-6 text-white" />
-          </div>
-          <Loader2 className="w-6 h-6 text-blue-500 animate-spin mx-auto mb-3" />
-          <p className="text-sm text-gray-600">正在還原上次的資料...</p>
-        </div>
-      </div>
-    );
+    return <AppBootSkeleton />;
   }
 
   const showBanner = hasRestoredData && !bannerDismissed;

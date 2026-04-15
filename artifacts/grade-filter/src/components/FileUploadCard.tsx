@@ -1,6 +1,7 @@
 import { useState, useRef, DragEvent } from "react";
-import { Upload, CheckCircle, AlertCircle, Loader2, X } from "lucide-react";
+import { Upload, CheckCircle, AlertCircle, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { UploadCardSkeleton } from "./Skeleton";
 
 interface FileUploadCardProps {
   title: string;
@@ -79,10 +80,7 @@ export default function FileUploadCard({
             onChange={handleChange}
           />
           {status === "loading" ? (
-            <div className="flex flex-col items-center gap-2">
-              <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
-              <p className="text-sm text-gray-600">解析中...</p>
-            </div>
+            <UploadCardSkeleton label="解析中..." />
           ) : status === "success" ? (
             <div className="flex flex-col items-center gap-2">
               <CheckCircle className="w-8 h-8 text-green-500" />
