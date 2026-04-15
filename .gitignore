@@ -10,6 +10,7 @@ out-tsc
 *.tsbuildinfo
 .expo
 .expo-shared
+storybook-static
 
 # dependencies
 node_modules
