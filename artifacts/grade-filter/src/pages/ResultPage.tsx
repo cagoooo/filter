@@ -13,6 +13,10 @@ import { useKeyboardShortcuts } from "../hooks/use-keyboard-shortcuts";
 import { useIsMobile } from "../hooks/use-mobile";
 import ScoreDistributionChart from "../components/ScoreDistributionChart";
 import { FilterSnapshotDialog } from "../components/FilterSnapshotDialog";
+import { VirtualResultList } from "../components/VirtualResultList";
+
+// P2.5：資料量 >= 200 筆時改用虛擬列表，DOM 節點約維持在可見 10~15 列
+const VIRTUAL_THRESHOLD = 200;
 
 type SortKey = keyof FilterResult | "none";
 type SortDir = "asc" | "desc";
@@ -492,7 +496,16 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
 
         {viewMode === "list" ? (
           <>
-            {isMobile ? (
+            {filtered.length >= VIRTUAL_THRESHOLD ? (
+              /* P2.5：大資料集使用虛擬捲動 */
+              <VirtualResultList
+                results={filtered}
+                isMobile={isMobile}
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onToggleSort={toggleSort}
+              />
+            ) : isMobile ? (
               /* P2.3 行動裝置：改用卡片列表取代橫向捲動表格 */
               <div className="divide-y divide-gray-100">
                 {filtered.length === 0 ? (
@@ -535,8 +548,13 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
                 </table>
               </div>
             )}
-            <div className="px-5 py-3 border-t border-gray-100 text-xs text-gray-500 bg-gray-50/30">
-              顯示 {filtered.length} 筆{excludedCount > 0 && !showExcluded && `（另有 ${excludedCount} 名特生已隱藏）`}
+            <div className="px-5 py-3 border-t border-gray-100 text-xs text-gray-500 bg-gray-50/30 flex items-center justify-between gap-2">
+              <span>顯示 {filtered.length} 筆{excludedCount > 0 && !showExcluded && `（另有 ${excludedCount} 名特生已隱藏）`}</span>
+              {filtered.length >= VIRTUAL_THRESHOLD && (
+                <span className="text-[10px] text-blue-600 bg-blue-50 border border-blue-100 rounded-full px-2 py-0.5">
+                  已啟用虛擬捲動
+                </span>
+              )}
             </div>
           </>
         ) : (
