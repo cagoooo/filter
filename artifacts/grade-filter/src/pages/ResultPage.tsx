@@ -10,6 +10,7 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useKeyboardShortcuts } from "../hooks/use-keyboard-shortcuts";
+import ScoreDistributionChart from "../components/ScoreDistributionChart";
 
 type SortKey = keyof FilterResult | "none";
 type SortDir = "asc" | "desc";
@@ -332,6 +333,8 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
           )}
         </div>
       )}
+
+      <ScoreDistributionChart results={filterResults} />
 
       {(gradeStats.length > 0 || subjectStats.length > 0) && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
