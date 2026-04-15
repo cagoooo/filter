@@ -148,6 +148,50 @@
   body {
     @apply font-sans antialiased bg-background text-foreground;
   }
+
+  /* ─── P2.3 RWD：行動裝置體驗優化 ─── */
+  /* 消除 iOS 300ms 點擊延遲 + 灰色 tap 高亮 */
+  button,
+  select,
+  input,
+  textarea,
+  a,
+  label {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* 行動裝置下確保按鈕至少 40px 高度（WCAG 推薦 44px 可點擊範圍） */
+  @media (max-width: 640px) {
+    button,
+    select,
+    [role="button"] {
+      min-height: 40px;
+    }
+    /* 小型 icon-only 按鈕允許縮小 */
+    button.h-icon-sm,
+    button[data-icon-only] {
+      min-height: 0;
+    }
+    /* 防止 iOS Safari 表單元素縮放 (<16px 會觸發自動 zoom) */
+    input[type="text"],
+    input[type="number"],
+    input[type="email"],
+    select,
+    textarea {
+      font-size: 16px;
+    }
+  }
+
+  /* 滾動平滑且在 iOS 啟用動量滾動 */
+  html {
+    scroll-behavior: smooth;
+  }
+  .overflow-x-auto,
+  .overflow-y-auto,
+  .overflow-auto {
+    -webkit-overflow-scrolling: touch;
+  }
 }
 
 /* ─── 列印友善樣式 ─── */

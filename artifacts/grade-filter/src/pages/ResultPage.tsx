@@ -10,6 +10,7 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useKeyboardShortcuts } from "../hooks/use-keyboard-shortcuts";
+import { useIsMobile } from "../hooks/use-mobile";
 import ScoreDistributionChart from "../components/ScoreDistributionChart";
 import { FilterSnapshotDialog } from "../components/FilterSnapshotDialog";
 
@@ -20,6 +21,7 @@ type ViewMode = "list" | "grouped";
 export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; onReset: () => void }) {
   const { filterResults, filterConfigs } = useAppContext();
   const [snapshotOpen, setSnapshotOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   const handleExport = () => {
     if (filterResults.length === 0) {
@@ -383,7 +385,7 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
       )}
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row gap-3">
+        <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row gap-2 sm:gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
@@ -455,7 +457,7 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
               title="匯出 Excel (Ctrl+E)"
             >
               <FileSpreadsheet className="w-4 h-4" />
-              Excel
+              <span className="hidden sm:inline">Excel</span>
             </button>
             <button
               onClick={() => {
@@ -467,7 +469,7 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
               className="flex items-center gap-1.5 px-3 py-2 bg-gray-600 text-white text-sm font-medium rounded-lg hover:bg-gray-700 transition-colors"
             >
               <FileText className="w-4 h-4" />
-              CSV
+              <span className="hidden sm:inline">CSV</span>
             </button>
             <button
               onClick={handlePrint}
@@ -475,7 +477,7 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
               title="列印 (Ctrl+P)"
             >
               <Printer className="w-4 h-4" />
-              列印
+              <span className="hidden sm:inline">列印</span>
             </button>
             <button
               onClick={() => setSnapshotOpen(true)}
@@ -483,42 +485,56 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
               title="快照與比較"
             >
               <Camera className="w-4 h-4" />
-              快照
+              <span className="hidden sm:inline">快照</span>
             </button>
           </div>
         </div>
 
         {viewMode === "list" ? (
           <>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50/30">
-                    {TABLE_COLS.map(({ key, label }) => (
-                      <th
-                        key={key}
-                        className="px-4 py-3 text-left text-xs font-semibold text-gray-600 cursor-pointer select-none whitespace-nowrap"
-                        onClick={() => toggleSort(key as SortKey)}
-                      >
-                        <span className="flex items-center gap-1">{label}<SortIcon k={key as SortKey} /></span>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.length === 0 ? (
-                    <tr>
-                      <td colSpan={10} className="px-4 py-12 text-center text-gray-400">
-                        <Users className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                        <p>沒有符合條件的資料</p>
-                      </td>
+            {isMobile ? (
+              /* P2.3 行動裝置：改用卡片列表取代橫向捲動表格 */
+              <div className="divide-y divide-gray-100">
+                {filtered.length === 0 ? (
+                  <div className="px-4 py-12 text-center text-gray-400">
+                    <Users className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                    <p>沒有符合條件的資料</p>
+                  </div>
+                ) : (
+                  filtered.map((r) => <ResultCard key={r.id} r={r} />)
+                )}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50/30">
+                      {TABLE_COLS.map(({ key, label }) => (
+                        <th
+                          key={key}
+                          className="px-4 py-3 text-left text-xs font-semibold text-gray-600 cursor-pointer select-none whitespace-nowrap"
+                          onClick={() => toggleSort(key as SortKey)}
+                        >
+                          <span className="flex items-center gap-1">{label}<SortIcon k={key as SortKey} /></span>
+                        </th>
+                      ))}
                     </tr>
-                  ) : (
-                    filtered.map((r) => <ResultRow key={r.id} r={r} />)
-                  )}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {filtered.length === 0 ? (
+                      <tr>
+                        <td colSpan={10} className="px-4 py-12 text-center text-gray-400">
+                          <Users className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                          <p>沒有符合條件的資料</p>
+                        </td>
+                      </tr>
+                    ) : (
+                      filtered.map((r) => <ResultRow key={r.id} r={r} />)
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
             <div className="px-5 py-3 border-t border-gray-100 text-xs text-gray-500 bg-gray-50/30">
               顯示 {filtered.length} 筆{excludedCount > 0 && !showExcluded && `（另有 ${excludedCount} 名特生已隱藏）`}
             </div>
@@ -727,5 +743,81 @@ function ScoreCell({ value, isFilter, isExcluded }: { value?: number; isFilter: 
     <span className={cn("text-sm font-semibold", isExcluded ? "text-gray-400" : isFilter ? "text-blue-700" : "text-gray-700")}>
       {value}
     </span>
+  );
+}
+
+/** P2.3 行動裝置用卡片（取代表格）*/
+function ResultCard({ r }: { r: FilterResult }) {
+  const subjects: Subject[] = ["chinese", "english", "math"];
+  const statusBadge =
+    r.status === "priority" ? (
+      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-100 rounded-full px-2 py-0.5">
+        <Star className="w-3 h-3 fill-amber-500 text-amber-500" />優先
+      </span>
+    ) : r.status === "excluded" ? (
+      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-gray-500 bg-gray-100 rounded-full px-2 py-0.5">
+        <UserX className="w-3 h-3" />已排除
+      </span>
+    ) : (
+      <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 rounded-full px-2 py-0.5">一般</span>
+    );
+
+  return (
+    <div
+      className={cn(
+        "px-4 py-3 transition-colors",
+        r.status === "excluded" ? "bg-gray-50/80 opacity-70"
+          : r.status === "priority" ? "bg-amber-50/30"
+          : "bg-white"
+      )}
+    >
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 mb-0.5">
+            <span className={cn("font-semibold text-sm truncate", r.status === "excluded" ? "text-gray-400" : "text-gray-900")}>
+              {r.name || "—"}
+            </span>
+            {statusBadge}
+          </div>
+          <p className="text-xs text-gray-500">
+            {r.grade ? (GRADE_LABELS[r.grade] || `${r.grade}年級`) : "—"}
+            {r.class && <> · {r.class}班</>}
+            {r.seatNo && <> · {r.seatNo}號</>}
+          </p>
+          <p className="text-[11px] font-mono text-gray-400 mt-0.5 truncate">{r.idNumber}</p>
+        </div>
+        <span className="text-[11px] font-medium text-gray-600 bg-gray-100 rounded-full px-2 py-0.5 flex-shrink-0">
+          {SUBJECT_LABELS[r.filterSubject]}
+        </span>
+      </div>
+      <div className="grid grid-cols-3 gap-2 mt-2">
+        {subjects.map((sub) => {
+          const v = r[sub];
+          const isFilter = r.filterSubject === sub;
+          return (
+            <div
+              key={sub}
+              className={cn(
+                "rounded-md px-2 py-1.5 border text-center",
+                isFilter
+                  ? "bg-blue-50 border-blue-200"
+                  : "bg-gray-50/60 border-gray-100"
+              )}
+            >
+              <p className="text-[10px] text-gray-500">{SUBJECT_LABELS[sub]}</p>
+              <p className={cn(
+                "text-sm font-bold",
+                r.status === "excluded" ? "text-gray-400"
+                  : v == null ? "text-gray-300"
+                  : isFilter ? "text-blue-700"
+                  : "text-gray-700"
+              )}>
+                {v == null ? "—" : v}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
