@@ -2,12 +2,16 @@ import { Switch, Route, Router, useLocation } from "wouter";
 import { AppProvider, useAppContext } from "./context/AppContext";
 import StepIndicator from "./components/StepIndicator";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { ShortcutHelpDialog } from "./components/ShortcutHelpDialog";
 import ImportPage from "./pages/ImportPage";
 import FilterPage from "./pages/FilterPage";
 import ResultPage from "./pages/ResultPage";
 import NotFound from "./pages/not-found";
-import { GraduationCap, Loader2, RotateCcw, X } from "lucide-react";
+import { GraduationCap, Loader2, RotateCcw, X, Keyboard } from "lucide-react";
 import { useState } from "react";
+import { Toaster } from "sonner";
+import { useKeyboardShortcuts } from "./hooks/use-keyboard-shortcuts";
+import { useDocumentTitle } from "./hooks/use-document-title";
 
 const STEPS = [
   { label: "匯入資料" },
@@ -21,6 +25,16 @@ function AppContent() {
   const [location, navigate] = useLocation();
   const { isLoading, hasRestoredData, clearAll } = useAppContext();
   const [bannerDismissed, setBannerDismissed] = useState(false);
+  const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
+
+  useDocumentTitle();
+  useKeyboardShortcuts({
+    onShowHelp: () => setShortcutHelpOpen(true),
+    onFocusSearch: () => {
+      const el = document.querySelector<HTMLInputElement>('input[type="text"][placeholder*="搜尋"]');
+      el?.focus();
+    },
+  });
 
   const currentStep = STEP_PATHS.indexOf(location === "" ? "/" : location);
   const activeStep = currentStep < 0 ? 0 : currentStep;
@@ -58,6 +72,14 @@ function AppContent() {
             <h1 className="text-lg font-bold text-gray-900">成績篩選系統</h1>
             <p className="text-xs text-gray-500">國小期中考成績篩選工具</p>
           </div>
+          <button
+            onClick={() => setShortcutHelpOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-transparent hover:border-blue-200"
+            title="鍵盤快捷鍵 (按 ? 鍵)"
+          >
+            <Keyboard className="w-4 h-4" />
+            <span className="hidden md:inline">快捷鍵</span>
+          </button>
           <button
             onClick={handleReset}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-200"
@@ -123,6 +145,9 @@ function AppContent() {
           </Switch>
         </ErrorBoundary>
       </main>
+
+      <ShortcutHelpDialog open={shortcutHelpOpen} onClose={() => setShortcutHelpOpen(false)} />
+      <Toaster position="top-right" richColors closeButton />
     </div>
   );
 }

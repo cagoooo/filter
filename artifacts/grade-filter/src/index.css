@@ -149,3 +149,131 @@
     @apply font-sans antialiased bg-background text-foreground;
   }
 }
+
+/* ─── 列印友善樣式 ─── */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 1.5cm;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 10pt !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* 隱藏不該列印的 UI */
+  .no-print,
+  header,
+  nav,
+  button,
+  .step-indicator,
+  .filter-bar,
+  [role="dialog"],
+  [data-sonner-toaster] {
+    display: none !important;
+  }
+
+  /* 主要內容全寬 */
+  main {
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* 列印容器 */
+  .print-container {
+    display: block !important;
+    background: white !important;
+    padding: 0 !important;
+  }
+
+  .print-header {
+    display: block !important;
+    text-align: center;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #000;
+  }
+
+  .print-header h1 {
+    font-size: 16pt !important;
+    font-weight: bold;
+    margin: 0;
+  }
+
+  .print-header .print-date {
+    font-size: 9pt;
+    color: #666;
+    margin-top: 0.25rem;
+  }
+
+  /* 表格優化 */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    page-break-inside: auto !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+    background: #f3f4f6 !important;
+  }
+
+  tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  th,
+  td {
+    border: 1px solid #d1d5db !important;
+    padding: 4px 6px !important;
+    font-size: 9pt !important;
+  }
+
+  th {
+    background: #e5e7eb !important;
+    font-weight: bold !important;
+  }
+
+  /* 狀態著色保留 */
+  .priority-row,
+  tr.bg-amber-50\/40,
+  tr.bg-amber-50\/30 {
+    background: #fef3c7 !important;
+  }
+
+  .excluded-row,
+  tr.bg-gray-50\/80 {
+    background: #f3f4f6 !important;
+  }
+
+  /* 依班級換頁（分組檢視） */
+  .print-group {
+    page-break-before: always;
+    page-break-inside: avoid;
+  }
+
+  .print-group:first-child {
+    page-break-before: auto;
+  }
+
+  /* 摺疊區預設展開 */
+  .print-expand {
+    display: block !important;
+  }
+
+  /* 頁腳 */
+  .print-footer {
+    display: block !important;
+    margin-top: 0.5rem;
+    font-size: 8pt;
+    color: #999;
+    text-align: right;
+  }
+}
+

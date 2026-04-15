@@ -5,9 +5,11 @@ import { exportToExcel, exportToCsv } from "../lib/excel";
 import {
   ArrowLeft, FileSpreadsheet, FileText, Star, Users,
   ChevronUp, ChevronDown, Search, RefreshCw, UserX, List, LayoutList,
-  TrendingUp,
+  TrendingUp, Printer,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import { useKeyboardShortcuts } from "../hooks/use-keyboard-shortcuts";
 
 type SortKey = keyof FilterResult | "none";
 type SortDir = "asc" | "desc";
@@ -15,6 +17,32 @@ type ViewMode = "list" | "grouped";
 
 export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; onReset: () => void }) {
   const { filterResults } = useAppContext();
+
+  const handleExport = () => {
+    if (filterResults.length === 0) {
+      toast.error("沒有資料可匯出");
+      return;
+    }
+    try {
+      exportToExcel(exportData(true), "篩選結果.xlsx");
+      toast.success(`已匯出 ${filterResults.length} 筆資料`);
+    } catch {
+      toast.error("匯出失敗");
+    }
+  };
+
+  const handlePrint = () => {
+    if (filterResults.length === 0) {
+      toast.error("沒有資料可列印");
+      return;
+    }
+    window.print();
+  };
+
+  useKeyboardShortcuts({
+    onExport: () => handleExport(),
+    onPrint: () => handlePrint(),
+  });
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("grade");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
@@ -173,7 +201,13 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
   ];
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 print-container">
+      <div className="print-header hidden">
+        <h1>成績篩選結果報表</h1>
+        <div className="print-date">
+          列印日期：{new Date().toLocaleDateString("zh-TW")} · 共 {priorityCount + normalCount} 人
+        </div>
+      </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
           <p className="text-xs text-gray-500 font-medium">篩選名單人次</p>
@@ -411,18 +445,32 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
               {showExcluded ? "隱藏特生" : "顯示特生"}
             </button>
             <button
-              onClick={() => exportToExcel(exportData(true), "篩選結果.xlsx")}
+              onClick={handleExport}
               className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
+              title="匯出 Excel (Ctrl+E)"
             >
               <FileSpreadsheet className="w-4 h-4" />
               Excel
             </button>
             <button
-              onClick={() => exportToCsv(exportData(true), "篩選結果.csv")}
+              onClick={() => {
+                try {
+                  exportToCsv(exportData(true), "篩選結果.csv");
+                  toast.success("已匯出 CSV");
+                } catch { toast.error("匯出失敗"); }
+              }}
               className="flex items-center gap-1.5 px-3 py-2 bg-gray-600 text-white text-sm font-medium rounded-lg hover:bg-gray-700 transition-colors"
             >
               <FileText className="w-4 h-4" />
               CSV
+            </button>
+            <button
+              onClick={handlePrint}
+              className="flex items-center gap-1.5 px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors no-print"
+              title="列印 (Ctrl+P)"
+            >
+              <Printer className="w-4 h-4" />
+              列印
             </button>
           </div>
         </div>
