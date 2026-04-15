@@ -13,6 +13,7 @@ import { Toaster } from "sonner";
 import { useKeyboardShortcuts } from "./hooks/use-keyboard-shortcuts";
 import { useDocumentTitle } from "./hooks/use-document-title";
 import { AppBootSkeleton } from "./components/Skeleton";
+import { PWAUpdatePrompt } from "./components/PWAUpdatePrompt";
 
 const STEPS = [
   { label: "匯入資料" },
@@ -139,6 +140,7 @@ function AppContent() {
 
       <ShortcutHelpDialog open={shortcutHelpOpen} onClose={() => setShortcutHelpOpen(false)} />
       <Toaster position="top-right" richColors closeButton />
+      <PWAUpdatePrompt />
     </div>
   );
 }
