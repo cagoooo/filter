@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useAppContext } from "../context/AppContext";
+import { useDataContext, useUIContext } from "../context/AppContext";
 import { ColumnMapping, DuplicateGroup, ScoreAnomaly, GradeScoreStat } from "../lib/excel";
 import {
   parseScoreFileAsync as parseScoreFile,
@@ -59,8 +59,8 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
     chineseFileName, englishFileName, mathFileName, currentFileName, specialFileName,
     setChineseFileName, setEnglishFileName, setMathFileName,
     setCurrentFileName, setSpecialFileName,
-    isLoading,
-  } = useAppContext();
+  } = useDataContext();
+  const { isLoading } = useUIContext();
 
   const [chineseState, setChineseState] = useState<FileState>(defaultFileState);
   const [englishState, setEnglishState] = useState<FileState>(defaultFileState);

@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useAppContext } from "../context/AppContext";
+import { useDataContext, useFilterContext } from "../context/AppContext";
 import { FilterConfig, FilterDirection, Subject, SUBJECT_LABELS, GRADE_LABELS } from "../types";
 import { Plus, Trash2, ArrowLeft, Play, Settings2, ChevronDown, ChevronUp, Layers, AlertTriangle, FolderOpen, Undo2, Redo2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -43,7 +43,8 @@ function detectCrossSubjectMismatches(
 }
 
 export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onNext: () => void }) {
-  const { filterConfigs, setFilterConfigs, runFilter, chineseData, englishData, mathData } = useAppContext();
+  const { filterConfigs, setFilterConfigs, runFilter } = useFilterContext();
+  const { chineseData, englishData, mathData } = useDataContext();
 
   const subjectCounts: Record<Subject, number> = {
     chinese: chineseData.length,
