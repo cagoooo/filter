@@ -35,6 +35,30 @@ function isScore(val: string): boolean {
   return !isNaN(n) && n >= 0 && n <= 150;
 }
 
+// 常見的「非數字成績」表示（缺考、補考、請假、轉學等）
+const ABSENT_MARKERS = new Set([
+  "缺", "缺考", "補", "補考", "請假", "轉學", "未考", "未到",
+  "—", "-", "–", "——", "──", "N/A", "NA", "null", "NULL", "無",
+  "?", "？", "X", "x", "／", "/",
+]);
+
+/**
+ * 安全解析成績：
+ * - 空值 / 非數字標記（缺考、補考、—）→ undefined
+ * - 超出合理範圍（< 0 或 > 150）→ undefined
+ * - 正常數字 → number
+ */
+export function parseScore(raw: unknown): number | undefined {
+  if (raw === null || raw === undefined || raw === "") return undefined;
+  const str = String(raw).trim();
+  if (!str) return undefined;
+  if (ABSENT_MARKERS.has(str)) return undefined;
+  const num = parseFloat(str);
+  if (isNaN(num)) return undefined;
+  if (num < 0 || num > 150) return undefined;
+  return num;
+}
+
 function isSmallInt(val: string): boolean {
   const n = parseInt(val, 10);
   return !isNaN(n) && n >= 1 && n <= 60 && String(n) === val.trim();
@@ -359,7 +383,7 @@ function buildStudents(rows: string[][], mapping: ColumnMapping, subject: Subjec
       grade = 0; className = classRaw;
     }
 
-    const score = scoreRaw !== "" ? parseFloat(scoreRaw) : undefined;
+    const score = parseScore(scoreRaw);
     if (!name && !idNumber) continue;
 
     students.push({
@@ -367,7 +391,7 @@ function buildStudents(rows: string[][], mapping: ColumnMapping, subject: Subjec
       studentId: seatNo || String(i),
       name, grade: isNaN(grade) ? 0 : grade,
       class: className, seatNo, idNumber,
-      [subject]: score !== undefined && !isNaN(score) ? score : undefined,
+      [subject]: score,
     });
   }
   return students;
@@ -387,38 +411,44 @@ export function remapStudents(
   return { students, warnings };
 }
 
+/**
+ * 以 ArrayBuffer 輸入的版本（供 Web Worker 直接呼叫）
+ */
+export function parseScoreBuffer(buffer: ArrayBuffer, subject: Subject): ParseResult {
+  const data = new Uint8Array(buffer);
+  const workbook = XLSX.read(data, { type: "array" });
+  const sheet = pickSheetForSubject(workbook, subject);
+  const rows: string[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: false });
+
+  if (rows.length < 1) {
+    return {
+      students: [], warnings: ["檔案內容為空"],
+      mapping: { nameIdx: -1, gradeIdx: -1, classIdx: -1, seatIdx: -1, idIdx: -1, scoreIdx: -1, gradeFromClass: false, dataStartRow: 0, colLabels: [] },
+      rawRows: rows,
+      duplicates: [], anomalies: [], gradeStats: [],
+    };
+  }
+
+  const scoreColumnCandidates: Record<Subject, string[]> = {
+    chinese: ["國文", "chinese", "中文", "國語"],
+    english: ["英文", "english", "英語"],
+    math: ["數學", "math", "數"],
+  };
+
+  const { mapping, warnings } = resolveMapping(rows, subject, scoreColumnCandidates[subject]);
+  const students = buildStudents(rows, mapping, subject);
+  const duplicates = detectDuplicates(students, mapping.dataStartRow);
+  const { anomalies, gradeStats } = analyzeScoreData(students, subject);
+
+  return { students, warnings, mapping, rawRows: rows, duplicates, anomalies, gradeStats };
+}
+
 export function parseScoreFile(file: File, subject: Subject): Promise<ParseResult> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const data = new Uint8Array(e.target!.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: "array" });
-        const sheet = pickSheetForSubject(workbook, subject);
-        const rows: string[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: false });
-
-        if (rows.length < 1) {
-          resolve({
-            students: [], warnings: ["檔案內容為空"],
-            mapping: { nameIdx: -1, gradeIdx: -1, classIdx: -1, seatIdx: -1, idIdx: -1, scoreIdx: -1, gradeFromClass: false, dataStartRow: 0, colLabels: [] },
-            rawRows: rows,
-            duplicates: [], anomalies: [], gradeStats: [],
-          });
-          return;
-        }
-
-        const scoreColumnCandidates: Record<Subject, string[]> = {
-          chinese: ["國文", "chinese", "中文", "國語"],
-          english: ["英文", "english", "英語"],
-          math: ["數學", "math", "數"],
-        };
-
-        const { mapping, warnings } = resolveMapping(rows, subject, scoreColumnCandidates[subject]);
-        const students = buildStudents(rows, mapping, subject);
-        const duplicates = detectDuplicates(students, mapping.dataStartRow);
-        const { anomalies, gradeStats } = analyzeScoreData(students, subject);
-
-        resolve({ students, warnings, mapping, rawRows: rows, duplicates, anomalies, gradeStats });
+        resolve(parseScoreBuffer(e.target!.result as ArrayBuffer, subject));
       } catch {
         reject(new Error("無法解析檔案，請確認格式正確"));
       }
@@ -485,31 +515,35 @@ function parseListSheetRows(rows: string[][], globalOffset: number): Student[] {
   return students;
 }
 
+export function parseListBuffer(buffer: ArrayBuffer): { students: Student[]; warnings: string[] } {
+  const data = new Uint8Array(buffer);
+  const workbook = XLSX.read(data, { type: "array" });
+
+  const allStudents: Student[] = [];
+  const warnings: string[] = [];
+  let globalOffset = 0;
+
+  for (const sheetName of workbook.SheetNames) {
+    const sheet = workbook.Sheets[sheetName];
+    const rows: string[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: false });
+    const students = parseListSheetRows(rows, globalOffset);
+    allStudents.push(...students);
+    globalOffset += rows.length;
+  }
+
+  if (allStudents.length === 0) {
+    warnings.push("檔案內容為空或無法辨識欄位");
+  }
+
+  return { students: allStudents, warnings };
+}
+
 export function parseListFile(file: File): Promise<{ students: Student[]; warnings: string[] }> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const data = new Uint8Array(e.target!.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: "array" });
-
-        const allStudents: Student[] = [];
-        const warnings: string[] = [];
-        let globalOffset = 0;
-
-        for (const sheetName of workbook.SheetNames) {
-          const sheet = workbook.Sheets[sheetName];
-          const rows: string[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: false });
-          const students = parseListSheetRows(rows, globalOffset);
-          allStudents.push(...students);
-          globalOffset += rows.length;
-        }
-
-        if (allStudents.length === 0) {
-          warnings.push("檔案內容為空或無法辨識欄位");
-        }
-
-        resolve({ students: allStudents, warnings });
+        resolve(parseListBuffer(e.target!.result as ArrayBuffer));
       } catch { reject(new Error("無法解析檔案")); }
     };
     reader.onerror = () => reject(new Error("讀取檔案失敗"));

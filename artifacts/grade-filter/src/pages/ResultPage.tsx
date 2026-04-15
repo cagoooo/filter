@@ -53,11 +53,16 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
   const groupedData = useMemo(() => {
     const map = new Map<string, FilterResult[]>();
     const sorted = [...filtered].sort((a, b) => {
-      if (a.grade !== b.grade) return a.grade - b.grade;
-      return String(a.class).localeCompare(String(b.class), "zh-TW");
+      const ga = a.grade || 0;
+      const gb = b.grade || 0;
+      if (ga !== gb) return ga - gb;
+      return String(a.class ?? "").localeCompare(String(b.class ?? ""), "zh-TW");
     });
     for (const r of sorted) {
-      const key = `${r.grade}-${r.class}`;
+      // 空值保護：避免產生 "undefined-undefined" 之類的 key
+      const gradeKey = r.grade || "未知";
+      const classKey = r.class && String(r.class).trim() ? r.class : "未知";
+      const key = `${gradeKey}-${classKey}`;
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(r);
     }
@@ -505,10 +510,10 @@ function ResultRow({ r }: { r: FilterResult }) {
           <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 bg-blue-50 rounded-full px-2.5 py-1">一般</span>
         )}
       </td>
-      <td className={cn("px-4 py-3 font-medium", r.status === "excluded" ? "text-gray-400" : "text-gray-900")}>{r.name}</td>
-      <td className="px-4 py-3 text-gray-500 text-xs">{GRADE_LABELS[r.grade] || `${r.grade}年級`}</td>
-      <td className="px-4 py-3 text-gray-500 text-xs">{r.class}</td>
-      <td className="px-4 py-3 text-gray-500 text-xs">{r.seatNo}</td>
+      <td className={cn("px-4 py-3 font-medium", r.status === "excluded" ? "text-gray-400" : "text-gray-900")}>{r.name || "—"}</td>
+      <td className="px-4 py-3 text-gray-500 text-xs">{r.grade ? (GRADE_LABELS[r.grade] || `${r.grade}年級`) : "—"}</td>
+      <td className="px-4 py-3 text-gray-500 text-xs">{r.class || "—"}</td>
+      <td className="px-4 py-3 text-gray-500 text-xs">{r.seatNo || "—"}</td>
       <td className={cn("px-4 py-3 font-mono text-xs", r.status === "excluded" ? "text-gray-400" : "text-gray-700")}>{r.idNumber}</td>
       <td className="px-4 py-3 text-center"><ScoreCell value={r.chinese} isFilter={r.filterSubject === "chinese"} isExcluded={r.status === "excluded"} /></td>
       <td className="px-4 py-3 text-center"><ScoreCell value={r.english} isFilter={r.filterSubject === "english"} isExcluded={r.status === "excluded"} /></td>
@@ -565,7 +570,7 @@ function GroupedView({
               >
                 <div className="flex items-center gap-3">
                   <span className="font-semibold text-gray-800 text-sm">
-                    {GRADE_LABELS[first.grade] || `${first.grade}年級`} · {first.class}
+                    {first.grade ? (GRADE_LABELS[first.grade] || `${first.grade}年級`) : "未知年級"} · {first.class || "未知班級"}
                   </span>
                   <span className="text-xs text-gray-500 bg-white border border-gray-200 rounded-full px-2.5 py-0.5">
                     {activeCount} 人

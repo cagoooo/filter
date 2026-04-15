@@ -1,6 +1,7 @@
 import { Switch, Route, Router, useLocation } from "wouter";
 import { AppProvider, useAppContext } from "./context/AppContext";
 import StepIndicator from "./components/StepIndicator";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import ImportPage from "./pages/ImportPage";
 import FilterPage from "./pages/FilterPage";
 import ResultPage from "./pages/ResultPage";
@@ -95,24 +96,32 @@ function AppContent() {
           <StepIndicator steps={STEPS} currentStep={activeStep} />
         </div>
 
-        <Switch>
-          <Route path="/">
-            <ImportPage onNext={() => navigate("/filter")} />
-          </Route>
-          <Route path="/filter">
-            <FilterPage
-              onPrev={() => navigate("/")}
-              onNext={() => navigate("/result")}
-            />
-          </Route>
-          <Route path="/result">
-            <ResultPage
-              onPrev={() => navigate("/filter")}
-              onReset={handleReset}
-            />
-          </Route>
-          <Route component={NotFound} />
-        </Switch>
+        <ErrorBoundary>
+          <Switch>
+            <Route path="/">
+              <ErrorBoundary>
+                <ImportPage onNext={() => navigate("/filter")} />
+              </ErrorBoundary>
+            </Route>
+            <Route path="/filter">
+              <ErrorBoundary>
+                <FilterPage
+                  onPrev={() => navigate("/")}
+                  onNext={() => navigate("/result")}
+                />
+              </ErrorBoundary>
+            </Route>
+            <Route path="/result">
+              <ErrorBoundary>
+                <ResultPage
+                  onPrev={() => navigate("/filter")}
+                  onReset={handleReset}
+                />
+              </ErrorBoundary>
+            </Route>
+            <Route component={NotFound} />
+          </Switch>
+        </ErrorBoundary>
       </main>
     </div>
   );
@@ -122,10 +131,12 @@ export default function App() {
   // Strip trailing slash so wouter base works in both dev (/) and prod (/filter/)
   const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   return (
-    <Router base={base}>
-      <AppProvider>
-        <AppContent />
-      </AppProvider>
-    </Router>
+    <ErrorBoundary>
+      <Router base={base}>
+        <AppProvider>
+          <AppContent />
+        </AppProvider>
+      </Router>
+    </ErrorBoundary>
   );
 }
