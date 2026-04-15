@@ -544,19 +544,20 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
         </div>
       </div>
 
-      <div className="flex justify-between items-center pt-2">
+      {/* P2.3 行動裝置：底部固定操作列；桌面維持一般流排佈 */}
+      <div className="flex justify-between items-center pt-2 gap-3 sm:static sticky bottom-0 sm:bg-transparent bg-white/95 sm:backdrop-blur-none backdrop-blur-sm sm:border-0 border-t border-gray-200 sm:py-0 py-3 sm:px-0 -mx-4 sm:mx-0 px-4 sm:shadow-none shadow-[0_-2px_8px_rgba(0,0,0,0.04)] z-10">
         <button
           onClick={onPrev}
-          className="flex items-center gap-2 px-5 py-2.5 border border-gray-300 text-gray-700 rounded-lg font-medium text-sm hover:bg-gray-50 transition-colors"
+          className="flex items-center gap-2 px-5 py-2.5 border border-gray-300 text-gray-700 rounded-lg font-medium text-sm hover:bg-gray-50 transition-colors flex-shrink-0"
         >
           <ArrowLeft className="w-4 h-4" />
-          上一步
+          <span className="hidden xs:inline sm:inline">上一步</span>
         </button>
 
         <button
           onClick={handleRun}
           disabled={configs.length === 0}
-          className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-1 sm:flex-none"
         >
           <Play className="w-4 h-4" />
           執行篩選
