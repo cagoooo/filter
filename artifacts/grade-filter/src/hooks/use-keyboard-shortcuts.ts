@@ -7,6 +7,8 @@ export interface ShortcutMap {
   onRerun?: () => void;
   onFocusSearch?: () => void;
   onShowHelp?: () => void;
+  onUndo?: () => void;
+  onRedo?: () => void;
 }
 
 /**
@@ -16,6 +18,8 @@ export interface ShortcutMap {
  * - Ctrl/Cmd + P：列印
  * - Ctrl/Cmd + F：聚焦搜尋框
  * - Ctrl/Shift + R：重新執行篩選
+ * - Ctrl/Cmd + Z：撤銷
+ * - Ctrl/Cmd + Shift + Z 或 Ctrl/Cmd + Y：還原
  * - ?：顯示快捷鍵說明
  */
 export function useKeyboardShortcuts(map: ShortcutMap = {}) {
@@ -81,6 +85,26 @@ export function useKeyboardShortcuts(map: ShortcutMap = {}) {
           if (e.shiftKey && map.onRerun) {
             e.preventDefault();
             map.onRerun();
+          }
+          break;
+        case "z":
+        case "Z":
+          if (inEditable) return;
+          if (e.shiftKey) {
+            if (map.onRedo) {
+              e.preventDefault();
+              map.onRedo();
+            }
+          } else if (map.onUndo) {
+            e.preventDefault();
+            map.onUndo();
+          }
+          break;
+        case "y":
+        case "Y":
+          if (!inEditable && map.onRedo) {
+            e.preventDefault();
+            map.onRedo();
           }
           break;
       }
