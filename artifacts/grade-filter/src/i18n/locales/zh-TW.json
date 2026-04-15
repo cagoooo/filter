@@ -1,0 +1,58 @@
+{
+  "app": {
+    "title": "成績篩選系統",
+    "subtitle": "國小期中考成績篩選工具"
+  },
+  "steps": {
+    "import": "匯入資料",
+    "filter": "設定篩選",
+    "result": "查看結果"
+  },
+  "actions": {
+    "reset": "清除資料",
+    "resetTitle": "清除所有資料，重新開始",
+    "shortcuts": "快捷鍵",
+    "shortcutsTitle": "鍵盤快捷鍵 (按 ? 鍵)",
+    "close": "關閉",
+    "cancel": "取消",
+    "confirm": "確認",
+    "save": "儲存",
+    "delete": "刪除",
+    "apply": "套用",
+    "prev": "上一步",
+    "next": "下一步",
+    "run": "執行篩選",
+    "exportExcel": "匯出 Excel",
+    "exportCsv": "匯出 CSV",
+    "print": "列印",
+    "snapshot": "保存快照"
+  },
+  "banner": {
+    "restored": "上次的資料已自動還原，可直接繼續操作。",
+    "restart": "清除資料，重新開始"
+  },
+  "subjects": {
+    "chinese": "國文",
+    "english": "英文",
+    "math": "數學"
+  },
+  "grades": {
+    "g1": "一年級",
+    "g2": "二年級",
+    "g3": "三年級",
+    "g4": "四年級",
+    "g5": "五年級",
+    "g6": "六年級"
+  },
+  "status": {
+    "priority": "優先",
+    "normal": "一般",
+    "excluded": "排除",
+    "virtualized": "已啟用虛擬捲動"
+  },
+  "language": {
+    "label": "語言",
+    "zhTW": "繁體中文",
+    "en": "English"
+  }
+}

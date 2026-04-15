@@ -1,15 +1,21 @@
 import { useEffect } from "react";
 import { useLocation } from "wouter";
+import { useTranslation } from "react-i18next";
 
-const TITLES: Record<string, string> = {
-  "/": "匯入成績 — 成績篩選系統",
-  "/filter": "設定篩選 — 成績篩選系統",
-  "/result": "篩選結果 — 成績篩選系統",
-};
-
+/**
+ * P3.5：document.title 亦跟隨 i18n 語言切換
+ * 格式：`<step> — <appTitle>`
+ */
 export function useDocumentTitle() {
   const [location] = useLocation();
+  const { t, i18n } = useTranslation();
+
   useEffect(() => {
-    document.title = TITLES[location] ?? "成績篩選系統";
-  }, [location]);
+    const appTitle = t("app.title");
+    const stepKey =
+      location === "/filter" ? "steps.filter" :
+      location === "/result" ? "steps.result" :
+      "steps.import";
+    document.title = `${t(stepKey)} — ${appTitle}`;
+  }, [location, t, i18n.language]);
 }
