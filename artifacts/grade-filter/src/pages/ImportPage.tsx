@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useDataContext, useUIContext } from "../context/AppContext";
 import { ColumnMapping, DuplicateGroup, ScoreAnomaly, GradeScoreStat } from "../lib/excel";
 import {
@@ -8,7 +9,7 @@ import {
 } from "../lib/excel-client";
 import FileUploadCard from "../components/FileUploadCard";
 import UploadPreview from "../components/UploadPreview";
-import { Student, Subject, SUBJECT_LABELS } from "../types";
+import { Student, Subject } from "../types";
 import { Info, ArrowRight, Users, UserX, AlertTriangle, ChevronDown, ChevronUp, Layers } from "lucide-react";
 import { toast } from "sonner";
 
@@ -52,6 +53,7 @@ function computeMismatches(listStudents: Student[], scoreStudents: Student[][]):
 }
 
 export default function ImportPage({ onNext }: { onNext: () => void }) {
+  const { t } = useTranslation();
   const {
     setChineseData, setEnglishData, setMathData,
     setCurrentStudents, setSpecialStudents,
@@ -88,15 +90,15 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
   useEffect(() => {
     if (isLoading) return;
     if (chineseData.length > 0 && chineseState.status === "idle")
-      setChineseState(restoredState(chineseFileName || "（上次匯入的資料）", chineseData.length));
+      setChineseState(restoredState(chineseFileName || t("import.restoredData"), chineseData.length));
     if (englishData.length > 0 && englishState.status === "idle")
-      setEnglishState(restoredState(englishFileName || "（上次匯入的資料）", englishData.length));
+      setEnglishState(restoredState(englishFileName || t("import.restoredData"), englishData.length));
     if (mathData.length > 0 && mathState.status === "idle")
-      setMathState(restoredState(mathFileName || "（上次匯入的資料）", mathData.length));
+      setMathState(restoredState(mathFileName || t("import.restoredData"), mathData.length));
     if (currentStudents.length > 0 && currentState.status === "idle")
-      setCurrentState(restoredState(currentFileName || "（上次匯入的資料）", currentStudents.length));
+      setCurrentState(restoredState(currentFileName || t("import.restoredData"), currentStudents.length));
     if (specialStudents.length > 0 && specialState.status === "idle")
-      setSpecialState(restoredState(specialFileName || "（上次匯入的資料）", specialStudents.length));
+      setSpecialState(restoredState(specialFileName || t("import.restoredData"), specialStudents.length));
   }, [isLoading]);
 
   const allScoreData = [chineseData, englishData, mathData];
@@ -147,7 +149,7 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
     } catch (err: unknown) {
       setState({
         status: "error",
-        errorMessage: err instanceof Error ? err.message : "解析失敗",
+        errorMessage: err instanceof Error ? err.message : t("upload.parseFailed"),
         warnings: [],
         count: 0,
       });
@@ -183,7 +185,7 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
       setCurrentState({ status: "success", fileName: file.name, warnings: result.warnings, count: result.students.length });
       recomputeCurrentMismatches(result.students, allScoreData);
     } catch (err: unknown) {
-      setCurrentState({ status: "error", errorMessage: err instanceof Error ? err.message : "解析失敗", warnings: [], count: 0 });
+      setCurrentState({ status: "error", errorMessage: err instanceof Error ? err.message : t("upload.parseFailed"), warnings: [], count: 0 });
     }
   };
 
@@ -196,7 +198,7 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
       setSpecialState({ status: "success", fileName: file.name, warnings: result.warnings, count: result.students.length });
       recomputeSpecialMismatches(result.students, allScoreData);
     } catch (err: unknown) {
-      setSpecialState({ status: "error", errorMessage: err instanceof Error ? err.message : "解析失敗", warnings: [], count: 0 });
+      setSpecialState({ status: "error", errorMessage: err instanceof Error ? err.message : t("upload.parseFailed"), warnings: [], count: 0 });
     }
   };
 
@@ -220,7 +222,7 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
       if (result.detectedSubjects.length === 0) {
         setMultiError(
           result.warnings[0] ??
-            "未偵測到任何科目欄位。請確認表頭包含「國文」「英文」「數學」等科目名稱。"
+            t("import.noSubjectDetected")
         );
         setMultiSummary(null);
         return;
@@ -260,10 +262,10 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
       recomputeCurrentMismatches(currentStudents, updatedScores);
       recomputeSpecialMismatches(specialStudents, updatedScores);
       toast.success(
-        `已匯入合併檔案：${result.detectedSubjects.map((s) => SUBJECT_LABELS[s]).join("、")}`
+        t("import.multiImported", { subjects: result.detectedSubjects.map((s) => t(`subjects.${s}`)).join(", ") })
       );
     } catch (err: unknown) {
-      setMultiError(err instanceof Error ? err.message : "解析失敗");
+      setMultiError(err instanceof Error ? err.message : t("upload.parseFailed"));
       setMultiSummary(null);
     } finally {
       setMultiLoading(false);
@@ -278,18 +280,15 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
       <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex gap-3">
         <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
         <div>
-          <p className="text-sm font-medium text-blue-800">Excel 欄位格式說明</p>
-          <p className="text-sm text-blue-700 mt-1">
-            每個成績檔案需包含：<strong>姓名、年級、班級、座號、身分證字號、成績</strong>等欄位。
-            欄位名稱不需完全一致，系統會自動辨識。資料會自動儲存在本裝置上，重新整理後仍可繼續操作。
-          </p>
+          <p className="text-sm font-medium text-blue-800">{t("import.formatTitle")}</p>
+          <span className="text-sm text-blue-700 mt-1 block" dangerouslySetInnerHTML={{ __html: t("import.formatDescription") }} />
         </div>
       </div>
 
       <section>
         <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
           <span className="w-7 h-7 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">1</span>
-          匯入各科成績
+          {t("import.importScores")}
         </h2>
 
         {/* 合併檔案匯入（P1.6）*/}
@@ -300,7 +299,7 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
           >
             <span className="flex items-center gap-2">
               <Layers className="w-4 h-4" />
-              單檔合併匯入（一個 Excel 同時包含國文/英文/數學成績）
+              {t("import.multiSubjectTitle")}
             </span>
             {multiExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
@@ -308,12 +307,11 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
           {multiExpanded && (
             <div className="bg-white border-t border-indigo-100 px-4 py-4 space-y-3">
               <p className="text-xs text-gray-600">
-                若您的 Excel 一個檔案同時放了三科成績（有「國文」「英文」「數學」欄位），可直接在這裡上傳，系統會自動拆分為三份資料。
-                下方分別匯入各科的方式仍可使用。
+                {t("import.multiSubjectDesc")}
               </p>
               <label className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg cursor-pointer hover:bg-indigo-700 transition-colors text-sm font-medium">
                 <Layers className="w-4 h-4" />
-                {multiLoading ? "解析中…" : "選擇合併檔案"}
+                {multiLoading ? t("import.parsingEllipsis") : t("import.selectMergedFile")}
                 <input
                   type="file"
                   accept=".xlsx,.xls,.csv"
@@ -334,12 +332,12 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
               {multiSummary && (
                 <div className="text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 space-y-1">
                   <p className="font-semibold">
-                    ✓ 已解析 {multiSummary.fileName}，偵測到 {multiSummary.detected.length} 個科目：
+                    {t("import.multiParsed", { fileName: multiSummary.fileName, count: multiSummary.detected.length })}
                   </p>
                   <ul className="list-disc list-inside">
                     {multiSummary.detected.map((s) => (
                       <li key={s}>
-                        {SUBJECT_LABELS[s]}：{multiSummary.counts[s]} 筆
+                        {t("import.subjectCount", { subject: t(`subjects.${s}`), count: multiSummary.counts[s] })}
                       </li>
                     ))}
                   </ul>
@@ -359,8 +357,8 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <FileUploadCard
-              title="國文成績"
-              description="期中考國文科成績"
+              title={t("import.chineseTitle")}
+              description={t("import.chineseDesc")}
               onFileSelect={(file) =>
                 handleScoreUpload(file, "chinese", setChineseState, setChineseData, setChineseExtras, setChineseFileName)
               }
@@ -387,8 +385,8 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
 
           <div>
             <FileUploadCard
-              title="英文成績"
-              description="期中考英文科成績"
+              title={t("import.englishTitle")}
+              description={t("import.englishDesc")}
               onFileSelect={(file) =>
                 handleScoreUpload(file, "english", setEnglishState, setEnglishData, setEnglishExtras, setEnglishFileName)
               }
@@ -415,8 +413,8 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
 
           <div>
             <FileUploadCard
-              title="數學成績"
-              description="期中考數學科成績"
+              title={t("import.mathTitle")}
+              description={t("import.mathDesc")}
               onFileSelect={(file) =>
                 handleScoreUpload(file, "math", setMathState, setMathData, setMathExtras, setMathFileName)
               }
@@ -447,19 +445,19 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
             {chineseData.length > 0 && (
               <span className="inline-flex items-center gap-1.5 text-sm text-green-700 bg-green-50 border border-green-200 rounded-full px-3 py-1">
                 <span className="w-2 h-2 bg-green-500 rounded-full" />
-                國文：{chineseData.length} 筆
+                {t("import.chineseCount", { count: chineseData.length })}
               </span>
             )}
             {englishData.length > 0 && (
               <span className="inline-flex items-center gap-1.5 text-sm text-green-700 bg-green-50 border border-green-200 rounded-full px-3 py-1">
                 <span className="w-2 h-2 bg-green-500 rounded-full" />
-                英文：{englishData.length} 筆
+                {t("import.englishCount", { count: englishData.length })}
               </span>
             )}
             {mathData.length > 0 && (
               <span className="inline-flex items-center gap-1.5 text-sm text-green-700 bg-green-50 border border-green-200 rounded-full px-3 py-1">
                 <span className="w-2 h-2 bg-green-500 rounded-full" />
-                數學：{mathData.length} 筆
+                {t("import.mathCount", { count: mathData.length })}
               </span>
             )}
           </div>
@@ -469,12 +467,12 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
       <section>
         <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
           <span className="w-7 h-7 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">2</span>
-          匯入輔助名單（選填）
+          {t("import.importLists")}
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FileUploadCard
-            title="在校生名單（當然優先）"
-            description="目前正在班上課的學生，篩選後自動加入並標示「優先」"
+            title={t("import.currentStudentsTitle")}
+            description={t("import.currentStudentsDesc")}
             onFileSelect={handleCurrentListUpload}
             status={currentState.status}
             fileName={currentState.fileName}
@@ -488,8 +486,8 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
             }}
           />
           <FileUploadCard
-            title="特生名單（排除施測）"
-            description="特殊生不參與篩選，依身分證字號比對排除，結果中仍可見"
+            title={t("import.specialStudentsTitle")}
+            description={t("import.specialStudentsDesc")}
             onFileSelect={handleSpecialListUpload}
             status={specialState.status}
             fileName={specialState.fileName}
@@ -509,13 +507,13 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
             {currentStudents.length > 0 && (
               <span className="inline-flex items-center gap-1.5 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-full px-3 py-1">
                 <Users className="w-3.5 h-3.5" />
-                在校生：{currentStudents.length} 名
+                {t("import.currentCount", { count: currentStudents.length })}
               </span>
             )}
             {specialStudents.length > 0 && (
               <span className="inline-flex items-center gap-1.5 text-sm text-red-700 bg-red-50 border border-red-200 rounded-full px-3 py-1">
                 <UserX className="w-3.5 h-3.5" />
-                特生排除：{specialStudents.length} 名
+                {t("import.specialCount", { count: specialStudents.length })}
               </span>
             )}
           </div>
@@ -529,7 +527,7 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
             >
               <span className="flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 text-amber-600" />
-                名單比對警示：有 {totalMismatches} 位在成績資料中找不到記錄（可能身分證字號有誤）
+                {t("import.mismatchWarning", { count: totalMismatches })}
               </span>
               {mismatchExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </button>
@@ -539,12 +537,12 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
                   <div>
                     <p className="text-xs font-semibold text-amber-800 mb-1.5 flex items-center gap-1">
                       <Users className="w-3.5 h-3.5" />
-                      在校生名單中，以下 {currentMismatches.length} 位在成績資料中找不到對應記錄：
+                      {t("import.currentMismatchTitle", { count: currentMismatches.length })}
                     </p>
                     <div className="space-y-1">
                       {currentMismatches.map((m, i) => (
                         <p key={i} className="text-xs text-amber-700 font-mono">
-                          • {m.name}（{m.idNumber || "無身分證字號"}）
+                          • {m.name}（{m.idNumber || t("import.noIdNumber")}）
                         </p>
                       ))}
                     </div>
@@ -554,19 +552,19 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
                   <div>
                     <p className="text-xs font-semibold text-amber-800 mb-1.5 flex items-center gap-1">
                       <UserX className="w-3.5 h-3.5" />
-                      特生名單中，以下 {specialMismatches.length} 位在成績資料中找不到對應記錄：
+                      {t("import.specialMismatchTitle", { count: specialMismatches.length })}
                     </p>
                     <div className="space-y-1">
                       {specialMismatches.map((m, i) => (
                         <p key={i} className="text-xs text-amber-700 font-mono">
-                          • {m.name}（{m.idNumber || "無身分證字號"}）
+                          • {m.name}（{m.idNumber || t("import.noIdNumber")}）
                         </p>
                       ))}
                     </div>
                   </div>
                 )}
                 <p className="text-xs text-amber-600 italic">
-                  請回頭核查這些學生在 Excel 中的身分證字號是否正確，或確認該學生是否確實有成績記錄。
+                  {t("import.mismatchHint")}
                 </p>
               </div>
             )}
@@ -580,7 +578,7 @@ export default function ImportPage({ onNext }: { onNext: () => void }) {
           disabled={!hasAnyScore}
           className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
-          下一步：設定篩選條件
+          {t("import.nextStep")}
           <ArrowRight className="w-4 h-4" />
         </button>
       </div>

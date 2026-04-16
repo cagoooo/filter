@@ -7,6 +7,7 @@
  * 同時若應用首次成功安裝離線快取，會以 toast 告知「已可離線使用」。
  */
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { RefreshCw, WifiOff } from "lucide-react";
 
@@ -20,6 +21,7 @@ type RegisterFn = (options: {
 }) => (reload?: boolean) => Promise<void>;
 
 export function PWAUpdatePrompt() {
+  const { t } = useTranslation();
   const [, setSwUpdater] = useState<((reload?: boolean) => Promise<void>) | null>(null);
 
   useEffect(() => {
@@ -40,13 +42,13 @@ export function PWAUpdatePrompt() {
               <div className="flex items-start gap-2">
                 <RefreshCw className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-sm font-medium">有新版本可用</p>
-                  <p className="text-xs text-gray-500 mt-0.5">點選下方按鈕立即套用</p>
+                  <p className="text-sm font-medium">{t("pwa.newVersion")}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{t("pwa.clickToApply")}</p>
                   <button
                     onClick={() => updater(true)}
                     className="mt-2 px-3 py-1 text-xs font-medium bg-blue-600 text-white rounded hover:bg-blue-700"
                   >
-                    重新整理
+                    {t("pwa.refresh")}
                   </button>
                 </div>
               </div>,
@@ -57,7 +59,7 @@ export function PWAUpdatePrompt() {
             toast(
               <div className="flex items-center gap-2">
                 <WifiOff className="w-4 h-4 text-green-600" />
-                <span className="text-sm">已可離線使用</span>
+                <span className="text-sm">{t("pwa.offlineReady")}</span>
               </div>,
               { duration: 4000 },
             );
