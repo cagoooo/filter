@@ -6,7 +6,8 @@
  * - Vitest 可直接以陣列餵入測資，無需啟動 React / Provider
  *
  * 篩選邏輯：
- * 1. 身分證統一以 `trim().toUpperCase()` 比對（大小寫不敏感）
+ * 1. 比對採「身分證 OR 姓名」雙鍵匹配 —— 即使匯入時欄位被錯位辨識
+ *    （ex. ID 誤判為姓名），只要有一邊對得上即能正確排除特生 / 標記優先
  * 2. 特殊生先排除篩選，以 "excluded" 狀態附於結果末段
  * 3. 優先名單（在校生）保底佔名額，**計入** cutCount 而非額外追加
  *    → 設定 33 人就是 33 人，優先 + 非優先合計不超過目標數
@@ -23,7 +24,32 @@ export interface RunFilterParams {
   configs: FilterConfig[];
 }
 
-const nid = (s: string) => s.trim().toUpperCase();
+const nid = (s: string | undefined | null) =>
+  (s ?? "").trim().toUpperCase();
+const nname = (s: string | undefined | null) => (s ?? "").trim();
+
+/**
+ * 建立「身分證 + 姓名」雙鍵集合。
+ * 當成績檔與名單檔其中一邊欄位辨識錯位時（ID ↔ 姓名交換），
+ * 仍能透過另一欄位交叉比對出同一人。
+ */
+function buildMatchSet(students: Student[]): Set<string> {
+  const keys = new Set<string>();
+  for (const s of students) {
+    const id = nid(s.idNumber);
+    const name = nname(s.name);
+    if (id) keys.add(id);
+    if (name) keys.add(name);
+  }
+  return keys;
+}
+
+/** 檢查該學生的 ID 或姓名是否命中集合中任一鍵。 */
+function matchesAny(s: Student, keys: Set<string>): boolean {
+  const id = nid(s.idNumber);
+  const name = nname(s.name);
+  return (!!id && keys.has(id)) || (!!name && keys.has(name));
+}
 
 export function runFilterPure(params: RunFilterParams): FilterResult[] {
   const {
@@ -38,8 +64,9 @@ export function runFilterPure(params: RunFilterParams): FilterResult[] {
   const allResults: FilterResult[] = [];
   const resultIdSet = new Set<string>();
 
-  const specialIdSet = new Set(specialStudents.map((s) => nid(s.idNumber)));
-  const currentIdSet = new Set(currentStudents.map((s) => nid(s.idNumber)));
+  // 雙鍵集合：同時以身分證、姓名為匹配鍵，避免欄位錯位漏抓
+  const specialKeys = buildMatchSet(specialStudents);
+  const currentKeys = buildMatchSet(currentStudents);
 
   const allDataBySubject: Record<Subject, Student[]> = {
     chinese: chineseData,
@@ -79,6 +106,12 @@ export function runFilterPure(params: RunFilterParams): FilterResult[] {
     return scores;
   };
 
+  /**
+   * 建立唯一 rowId —— 為避免欄位錯位導致同一人產生不同 rowId（一般+已排除雙列），
+   * 優先採用 ID，若無則 fallback 到姓名，確保同一人在同一 subject 下只有一筆。
+   */
+  const makeRowKey = (s: Student): string => nid(s.idNumber) || nname(s.name) || `anon-${Math.random()}`;
+
   const addResult = (
     s: Student,
     status: "priority" | "normal" | "excluded",
@@ -106,7 +139,7 @@ export function runFilterPure(params: RunFilterParams): FilterResult[] {
   for (const config of configs) {
     const data = getSubjectData(config.subject);
     const gradeData = data.filter((s) => s.grade === config.grade);
-    const nonSpecial = gradeData.filter((s) => !specialIdSet.has(nid(s.idNumber)));
+    const nonSpecial = gradeData.filter((s) => !matchesAny(s, specialKeys));
 
     const isBottom = config.direction === "bottom";
     const sorted = [...nonSpecial].sort((a, b) => {
@@ -124,20 +157,21 @@ export function runFilterPure(params: RunFilterParams): FilterResult[] {
 
     // ── 優先名單佔名額，計入 cutCount ──
     // 1. 優先學生（在校生且非特生）——有該科成績的部分
-    const priorityInData = nonSpecial.filter((s) => currentIdSet.has(nid(s.idNumber)));
-    const priorityInDataIds = new Set(priorityInData.map((s) => nid(s.idNumber)));
+    const priorityInData = nonSpecial.filter((s) => matchesAny(s, currentKeys));
+    // 以雙鍵集合避免欄位錯位導致同一人被判定為「不在 priorityInData」而再次加入
+    const priorityInDataMatchKeys = buildMatchSet(priorityInData);
 
     // 2. 優先學生——無該科成績但出現在 currentStudents 名單中
     const priorityWithoutScores = currentStudents.filter(
       (s) =>
         s.grade === config.grade &&
-        !specialIdSet.has(nid(s.idNumber)) &&
-        !priorityInDataIds.has(nid(s.idNumber)),
+        !matchesAny(s, specialKeys) &&
+        !matchesAny(s, priorityInDataMatchKeys),
     );
     const totalPriorityCount = priorityInData.length + priorityWithoutScores.length;
 
     // 3. 非優先學生依分數排序
-    const nonPrioritySorted = sorted.filter((s) => !currentIdSet.has(nid(s.idNumber)));
+    const nonPrioritySorted = sorted.filter((s) => !matchesAny(s, currentKeys));
 
     // 4. 剩餘名額 = 目標數 − 優先人數（優先超出目標時仍全數保留）
     const remainingSlots = Math.max(0, cutCount - totalPriorityCount);
@@ -146,18 +180,18 @@ export function runFilterPure(params: RunFilterParams): FilterResult[] {
     // 5. 寫入結果：先優先、再非優先
     for (const s of priorityInData) {
       const score = s[config.subject] ?? 0;
-      const rowId = `${nid(s.idNumber)}-${config.subject}`;
+      const rowId = `${makeRowKey(s)}-${config.subject}`;
       addResult(s, "priority", config.subject, score, rowId);
     }
     for (const s of priorityWithoutScores) {
       const scoreMatch = idMaps[config.subject]?.get(nid(s.idNumber));
       const score = scoreMatch?.[config.subject] ?? 0;
-      const rowId = `${nid(s.idNumber)}-${config.subject}`;
+      const rowId = `${makeRowKey(s)}-${config.subject}`;
       addResult(s, "priority", config.subject, score as number, rowId);
     }
     for (const s of filledNonPriority) {
       const score = s[config.subject] ?? 0;
-      const rowId = `${nid(s.idNumber)}-${config.subject}`;
+      const rowId = `${makeRowKey(s)}-${config.subject}`;
       addResult(s, "normal", config.subject, score, rowId);
     }
 
@@ -165,7 +199,7 @@ export function runFilterPure(params: RunFilterParams): FilterResult[] {
     for (const s of specialInConfig) {
       const scoreMatch = idMaps[config.subject]?.get(nid(s.idNumber));
       const score = scoreMatch?.[config.subject] ?? 0;
-      const rowId = `excluded-${nid(s.idNumber)}-${config.subject}`;
+      const rowId = `excluded-${makeRowKey(s)}-${config.subject}`;
       addResult(s, "excluded", config.subject, score as number, rowId);
     }
   }

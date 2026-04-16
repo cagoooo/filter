@@ -268,6 +268,93 @@ describe("runFilterPure — 標記優先學生", () => {
   });
 });
 
+describe("runFilterPure — 欄位錯位容錯（以 ID 或姓名其中一邊交叉比對）", () => {
+  it("成績檔的 ID/姓名欄位錯位時，特生仍應被排除不出現在 normal", () => {
+    // 模擬真實情境：成績檔欄位辨識錯位 → name 放 ID、idNumber 放姓名
+    // 特生名單則正確：name 放姓名、idNumber 放 ID
+    const scoreStudents = [
+      { ...mkStudent({ idNumber: "張小明", name: "A123456789" }), chinese: 90 },
+      { ...mkStudent({ idNumber: "李大仁", name: "B234567890" }), chinese: 85 },
+      // 這位是特生（以正確的 ID 比對應排除）
+      { ...mkStudent({ idNumber: "黃士航", name: "H1275439" }), chinese: 64 },
+    ];
+    const special = [
+      mkStudent({ idNumber: "H1275439", name: "黃士航" }), // 正確格式的特生名單
+    ];
+
+    const result = runFilterPure({
+      chineseData: scoreStudents,
+      englishData: [],
+      mathData: [],
+      currentStudents: [],
+      specialStudents: special,
+      configs: [{ grade: 3, subject: "chinese", mode: "count", value: 10, direction: "top" }],
+    });
+
+    // 黃士航 不應出現在 normal 中
+    const normalIds = result
+      .filter((r) => r.status === "normal")
+      .map((r) => `${r.idNumber}/${r.name}`);
+    expect(normalIds).not.toContain("黃士航/H1275439");
+    expect(normalIds).not.toContain("H1275439/黃士航");
+
+    // 應以 excluded 狀態出現（恰好一次）
+    const excluded = result.filter((r) => r.status === "excluded");
+    expect(excluded).toHaveLength(1);
+  });
+
+  it("名單檔的 ID/姓名錯位時（反向情境）亦能正確排除", () => {
+    const scoreStudents = [
+      { ...mkStudent({ idNumber: "C345678901", name: "王五" }), chinese: 95 },
+      { ...mkStudent({ idNumber: "H1275439", name: "黃士航" }), chinese: 64 },
+    ];
+    // 特生名單欄位錯位：name 放 ID、idNumber 放姓名
+    const special = [
+      mkStudent({ idNumber: "黃士航", name: "H1275439" }),
+    ];
+
+    const result = runFilterPure({
+      chineseData: scoreStudents,
+      englishData: [],
+      mathData: [],
+      currentStudents: [],
+      specialStudents: special,
+      configs: [{ grade: 3, subject: "chinese", mode: "count", value: 10, direction: "top" }],
+    });
+
+    const normal = result.filter((r) => r.status === "normal");
+    // 只有王五一人應為 normal
+    expect(normal).toHaveLength(1);
+    expect(normal[0].idNumber).toBe("C345678901");
+  });
+
+  it("優先名單欄位錯位時，仍能正確標記 priority", () => {
+    const scoreStudents = [
+      { ...mkStudent({ idNumber: "P999", name: "學生A" }), chinese: 50 },
+      { ...mkStudent({ idNumber: "陳小華", name: "P888" }), chinese: 90 }, // 成績檔錯位
+    ];
+    const current = [
+      mkStudent({ idNumber: "P888", name: "陳小華" }), // 正確格式的在校生
+    ];
+
+    const result = runFilterPure({
+      chineseData: scoreStudents,
+      englishData: [],
+      mathData: [],
+      currentStudents: current,
+      specialStudents: [],
+      configs: [{ grade: 3, subject: "chinese", mode: "count", value: 10, direction: "top" }],
+    });
+
+    const priority = result.filter((r) => r.status === "priority");
+    expect(priority).toHaveLength(1);
+    // 無論鍵值怎麼對上，確認陳小華被識別為優先
+    const isChenMatched =
+      priority[0].idNumber === "陳小華" || priority[0].name === "陳小華";
+    expect(isChenMatched).toBe(true);
+  });
+});
+
 describe("runFilterPure — ID 大小寫不敏感比對", () => {
   it("特殊生 ID 小寫也能正確排除對應的成績資料", () => {
     const students = [
