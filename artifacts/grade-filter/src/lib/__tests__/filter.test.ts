@@ -204,7 +204,7 @@ describe("runFilterPure — 標記優先學生", () => {
     expect(priority[0].idNumber).toBe("G100000002");
   });
 
-  it("優先名單未落在 top N → 仍以 priority 狀態補入結果", () => {
+  it("優先名單未落在 top N → 仍保底納入，但計入名額而非額外追加", () => {
     const students = [
       mkStudent({ idNumber: "H100000001", chinese: 100 }),
       mkStudent({ idNumber: "H100000002", chinese: 90 }),
@@ -220,10 +220,51 @@ describe("runFilterPure — 標記優先學生", () => {
       configs: [{ grade: 3, subject: "chinese", mode: "count", value: 2, direction: "top" }],
     });
 
+    // 優先 1 人 + 非優先 1 人 = 剛好 2 人（不是 2+1=3）
+    const nonExcluded = result.filter((r) => r.status !== "excluded");
+    expect(nonExcluded).toHaveLength(2);
+
     const priority = result.filter((r) => r.status === "priority");
     expect(priority).toHaveLength(1);
     expect(priority[0].idNumber).toBe("H100000003");
     expect(priority[0].filterScore).toBe(30);
+
+    const normal = result.filter((r) => r.status === "normal");
+    expect(normal).toHaveLength(1);
+    expect(normal[0].filterScore).toBe(100); // 剩餘 1 個名額給最高分
+  });
+
+  it("固定人數不因優先名單膨脹（迴歸測試）", () => {
+    // 模擬 bug：設定 5 人，3 位優先在名額外 → 舊版會變 5+3=8
+    const students = Array.from({ length: 10 }, (_, i) =>
+      mkStudent({ idNumber: `R${100000000 + i}`, chinese: 100 - i * 5 }),
+    );
+    // 優先名單：第 6、7、8 名（分數 75, 70, 65）不在 top 5 內
+    const current = [
+      mkStudent({ idNumber: "R100000005" }), // 75 分
+      mkStudent({ idNumber: "R100000006" }), // 70 分
+      mkStudent({ idNumber: "R100000007" }), // 65 分
+    ];
+    const result = runFilterPure({
+      chineseData: students,
+      englishData: [],
+      mathData: [],
+      currentStudents: current,
+      specialStudents: [],
+      configs: [{ grade: 3, subject: "chinese", mode: "count", value: 5, direction: "top" }],
+    });
+
+    const nonExcluded = result.filter((r) => r.status !== "excluded");
+    // 3 priority + 2 normal = 5，不是 5+3=8
+    expect(nonExcluded).toHaveLength(5);
+    expect(result.filter((r) => r.status === "priority")).toHaveLength(3);
+    expect(result.filter((r) => r.status === "normal")).toHaveLength(2);
+    // 非優先的 2 人應該是最高分的 100 和 95
+    const normalScores = result
+      .filter((r) => r.status === "normal")
+      .map((r) => r.filterScore)
+      .sort((a, b) => b - a);
+    expect(normalScores).toEqual([100, 95]);
   });
 });
 
