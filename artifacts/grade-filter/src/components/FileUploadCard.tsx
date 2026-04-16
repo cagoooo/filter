@@ -1,4 +1,5 @@
 import { useState, useRef, DragEvent } from "react";
+import { useTranslation } from "react-i18next";
 import { Upload, CheckCircle, AlertCircle, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { UploadCardSkeleton } from "./Skeleton";
@@ -26,6 +27,7 @@ export default function FileUploadCard({
   warnings = [],
   onClear,
 }: FileUploadCardProps) {
+  const { t } = useTranslation();
   const [isDragging, setIsDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -80,33 +82,33 @@ export default function FileUploadCard({
             onChange={handleChange}
           />
           {status === "loading" ? (
-            <UploadCardSkeleton label="解析中..." />
+            <UploadCardSkeleton label={t("upload.parsing")} />
           ) : status === "success" ? (
             <div className="flex flex-col items-center gap-2">
               <CheckCircle className="w-8 h-8 text-green-500" />
               <p className="text-sm font-medium text-green-700">{fileName}</p>
-              <p className="text-xs text-green-600">匯入成功，點擊重新上傳</p>
+              <p className="text-xs text-green-600">{t("upload.successReupload")}</p>
             </div>
           ) : status === "error" ? (
             <div className="flex flex-col items-center gap-2">
               <AlertCircle className="w-8 h-8 text-red-500" />
               <p className="text-sm text-red-700">{errorMessage}</p>
-              <p className="text-xs text-gray-500">點擊重新上傳</p>
+              <p className="text-xs text-gray-500">{t("upload.clickToReupload")}</p>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-2">
               <Upload className="w-8 h-8 text-gray-400" />
               <p className="text-sm text-gray-600">
-                拖曳檔案至此，或點擊選擇檔案
+                {t("upload.dragOrClick")}
               </p>
-              <p className="text-xs text-gray-400">支援格式：{acceptedFormats}</p>
+              <p className="text-xs text-gray-400">{t("upload.supportedFormats")}{acceptedFormats}</p>
             </div>
           )}
         </div>
 
         {warnings.length > 0 && status === "success" && (
           <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-3">
-            <p className="text-xs font-medium text-amber-700 mb-1">注意事項：</p>
+            <p className="text-xs font-medium text-amber-700 mb-1">{t("upload.warningLabel")}</p>
             {warnings.map((w, i) => (
               <p key={i} className="text-xs text-amber-600">
                 • {w}
@@ -124,7 +126,7 @@ export default function FileUploadCard({
             className="mt-3 w-full flex items-center justify-center gap-1.5 text-sm text-gray-500 hover:text-red-500 transition-colors"
           >
             <X className="w-4 h-4" />
-            清除資料
+            {t("upload.clearData")}
           </button>
         )}
       </div>

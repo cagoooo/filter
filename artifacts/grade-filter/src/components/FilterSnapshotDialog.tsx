@@ -1,10 +1,9 @@
 import { useState, useEffect, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import {
   FilterConfig,
   FilterResult,
   FilterSnapshot,
-  SUBJECT_LABELS,
-  GRADE_LABELS,
   Subject,
 } from "../types";
 import { storageGet, storageSet, STORAGE_KEYS } from "../lib/storage";
@@ -41,9 +40,6 @@ function getSnapshotLabel(s: SnapshotRef): string {
 }
 function getSnapshotResults(s: SnapshotRef): FilterResult[] {
   return s.type === "current" ? s.results : s.snapshot.results;
-}
-function getSnapshotConfigs(s: SnapshotRef): FilterConfig[] {
-  return s.type === "current" ? s.configs : s.snapshot.configs;
 }
 
 interface DiffEntry {
@@ -133,7 +129,7 @@ function computeDiff(a: FilterResult[], b: FilterResult[]): {
   }
 
   const gradeClsSort = (x: DiffEntry, y: DiffEntry) =>
-    x.grade - y.grade || String(x.cls ?? "").localeCompare(String(y.cls ?? ""), "zh-TW");
+    x.grade - y.grade || String(x.cls ?? "").localeCompare(String(y.cls ?? ""));
   onlyA.sort(gradeClsSort);
   onlyB.sort(gradeClsSort);
   changed.sort(gradeClsSort);
@@ -141,19 +137,20 @@ function computeDiff(a: FilterResult[], b: FilterResult[]): {
   return { onlyA, onlyB, changed, unchanged };
 }
 
-const statusLabel: Record<"priority" | "normal" | "excluded", string> = {
-  priority: "優先",
-  normal: "一般",
-  excluded: "特生",
-};
-
 export function FilterSnapshotDialog({ open, onClose, currentConfigs, currentResults }: Props) {
+  const { t } = useTranslation();
   const [snapshots, setSnapshots] = useState<FilterSnapshot[]>([]);
   const [mode, setMode] = useState<"list" | "save" | "compare">("list");
   const [selectedA, setSelectedA] = useState<string>("__current__");
   const [selectedB, setSelectedB] = useState<string>("");
   const [newLabel, setNewLabel] = useState("");
   const [newNote, setNewNote] = useState("");
+
+  const statusLabel: Record<"priority" | "normal" | "excluded", string> = {
+    priority: t("status.priority"),
+    normal: t("status.normal"),
+    excluded: t("snapshot.specialStudent"),
+  };
 
   useEffect(() => {
     if (open) loadSnapshots();
@@ -167,11 +164,11 @@ export function FilterSnapshotDialog({ open, onClose, currentConfigs, currentRes
 
   async function saveSnapshot() {
     if (!newLabel.trim()) {
-      toast.error("請輸入快照名稱");
+      toast.error(t("snapshot.nameRequired"));
       return;
     }
     if (currentResults.length === 0) {
-      toast.error("目前沒有篩選結果可快照");
+      toast.error(t("snapshot.noResultsToSnapshot"));
       return;
     }
     const snap: FilterSnapshot = {
@@ -188,17 +185,17 @@ export function FilterSnapshotDialog({ open, onClose, currentConfigs, currentRes
     setNewLabel("");
     setNewNote("");
     setMode("list");
-    toast.success(`已儲存快照「${snap.label}」`);
+    toast.success(t("snapshot.saved", { name: snap.label }));
   }
 
   async function deleteSnapshot(id: string) {
     const s = snapshots.find((x) => x.id === id);
     if (!s) return;
-    if (!confirm(`確定刪除快照「${s.label}」？`)) return;
+    if (!confirm(t("snapshot.confirmDelete", { name: s.label }))) return;
     const next = snapshots.filter((x) => x.id !== id);
     await storageSet(STORAGE_KEYS.FILTER_SNAPSHOTS, next);
     setSnapshots(next);
-    toast.success("已刪除");
+    toast.success(t("snapshot.deleted"));
   }
 
   const allRefs: SnapshotRef[] = useMemo(() => {
@@ -206,14 +203,14 @@ export function FilterSnapshotDialog({ open, onClose, currentConfigs, currentRes
     if (currentResults.length > 0) {
       refs.push({
         type: "current",
-        label: "目前結果",
+        label: t("snapshot.currentResult"),
         configs: currentConfigs,
         results: currentResults,
       });
     }
     for (const s of snapshots) refs.push({ type: "saved", snapshot: s });
     return refs;
-  }, [snapshots, currentConfigs, currentResults]);
+  }, [snapshots, currentConfigs, currentResults, t]);
 
   const refA = allRefs.find((r) => getSnapshotId(r) === selectedA) ?? null;
   const refB = allRefs.find((r) => getSnapshotId(r) === selectedB) ?? null;
@@ -238,7 +235,7 @@ export function FilterSnapshotDialog({ open, onClose, currentConfigs, currentRes
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Camera className="w-5 h-5 text-indigo-600" />
-            <h2 className="font-bold text-gray-900">篩選結果快照</h2>
+            <h2 className="font-bold text-gray-900">{t("snapshot.dialogTitle")}</h2>
             <span className="text-xs text-gray-500">({snapshots.length})</span>
           </div>
           <div className="flex items-center gap-1">
@@ -246,19 +243,19 @@ export function FilterSnapshotDialog({ open, onClose, currentConfigs, currentRes
               onClick={() => setMode(mode === "save" ? "list" : "save")}
               className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded transition-colors"
               disabled={currentResults.length === 0}
-              title="儲存目前結果為快照"
+              title={t("snapshot.saveCurrent")}
             >
               <Plus className="w-3.5 h-3.5" />
-              新快照
+              {t("snapshot.new")}
             </button>
             <button
               onClick={() => setMode(mode === "compare" ? "list" : "compare")}
               className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded transition-colors"
               disabled={allRefs.length < 2}
-              title="比較兩個快照"
+              title={t("snapshot.compareTwoSnapshots")}
             >
               <GitCompare className="w-3.5 h-3.5" />
-              比較
+              {t("snapshot.compare")}
             </button>
             <button
               onClick={onClose}
@@ -274,33 +271,33 @@ export function FilterSnapshotDialog({ open, onClose, currentConfigs, currentRes
             <div className="p-5 space-y-3">
               <h3 className="font-semibold text-gray-900 flex items-center gap-2">
                 <Camera className="w-4 h-4 text-indigo-600" />
-                儲存目前篩選結果
+                {t("snapshot.saveCurrentResults")}
               </h3>
               <div>
-                <label className="text-xs font-medium text-gray-600">快照名稱 *</label>
+                <label className="text-xs font-medium text-gray-600">{t("snapshot.nameLabel")}</label>
                 <input
                   type="text"
                   value={newLabel}
                   onChange={(e) => setNewLabel(e.target.value)}
-                  placeholder="例：初版 v1 / 上調門檻 10% / 加入轉學生"
+                  placeholder={t("snapshot.namePlaceholder")}
                   className="w-full mt-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-600">備註（選填）</label>
+                <label className="text-xs font-medium text-gray-600">{t("snapshot.noteLabel")}</label>
                 <textarea
                   value={newNote}
                   onChange={(e) => setNewNote(e.target.value)}
-                  placeholder="記錄此次篩選的調整原因..."
+                  placeholder={t("snapshot.notePlaceholder")}
                   rows={2}
                   className="w-full mt-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
               <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-600">
-                <p className="font-medium">將保存：</p>
+                <p className="font-medium">{t("snapshot.willSave")}</p>
                 <ul className="mt-1 space-y-0.5 list-disc list-inside">
-                  <li>{currentConfigs.length} 筆篩選條件</li>
-                  <li>{currentResults.length} 筆結果（含優先 / 一般 / 特生）</li>
+                  <li>{t("snapshot.filterConditionCount", { count: currentConfigs.length })}</li>
+                  <li>{t("snapshot.resultCountWithStatus", { count: currentResults.length })}</li>
                 </ul>
               </div>
               <div className="flex gap-2">
@@ -308,13 +305,13 @@ export function FilterSnapshotDialog({ open, onClose, currentConfigs, currentRes
                   onClick={saveSnapshot}
                   className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700"
                 >
-                  儲存快照
+                  {t("snapshot.saveButton")}
                 </button>
                 <button
                   onClick={() => setMode("list")}
                   className="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50"
                 >
-                  取消
+                  {t("actions.cancel")}
                 </button>
               </div>
             </div>
@@ -324,18 +321,18 @@ export function FilterSnapshotDialog({ open, onClose, currentConfigs, currentRes
                 <div>
                   <label className="text-xs font-medium text-gray-600 flex items-center gap-1">
                     <span className="w-4 h-4 bg-blue-100 text-blue-700 rounded text-[10px] font-bold flex items-center justify-center">A</span>
-                    快照 A
+                    {t("snapshot.snapshotA")}
                   </label>
                   <select
                     value={selectedA}
                     onChange={(e) => setSelectedA(e.target.value)}
                     className="w-full mt-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   >
-                    <option value="">— 請選擇 —</option>
+                    <option value="">{t("snapshot.selectPlaceholder")}</option>
                     {allRefs.map((r) => (
                       <option key={getSnapshotId(r)} value={getSnapshotId(r)}>
                         {getSnapshotLabel(r)}
-                        {r.type === "saved" ? ` (${new Date(r.snapshot.createdAt).toLocaleDateString("zh-TW")})` : ""}
+                        {r.type === "saved" ? ` (${new Date(r.snapshot.createdAt).toLocaleDateString()})` : ""}
                       </option>
                     ))}
                   </select>
@@ -343,18 +340,18 @@ export function FilterSnapshotDialog({ open, onClose, currentConfigs, currentRes
                 <div>
                   <label className="text-xs font-medium text-gray-600 flex items-center gap-1">
                     <span className="w-4 h-4 bg-emerald-100 text-emerald-700 rounded text-[10px] font-bold flex items-center justify-center">B</span>
-                    快照 B
+                    {t("snapshot.snapshotB")}
                   </label>
                   <select
                     value={selectedB}
                     onChange={(e) => setSelectedB(e.target.value)}
                     className="w-full mt-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   >
-                    <option value="">— 請選擇 —</option>
+                    <option value="">{t("snapshot.selectPlaceholder")}</option>
                     {allRefs.map((r) => (
                       <option key={getSnapshotId(r)} value={getSnapshotId(r)}>
                         {getSnapshotLabel(r)}
-                        {r.type === "saved" ? ` (${new Date(r.snapshot.createdAt).toLocaleDateString("zh-TW")})` : ""}
+                        {r.type === "saved" ? ` (${new Date(r.snapshot.createdAt).toLocaleDateString()})` : ""}
                       </option>
                     ))}
                   </select>
@@ -382,52 +379,52 @@ export function FilterSnapshotDialog({ open, onClose, currentConfigs, currentRes
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
                     <div className="bg-rose-50 border border-rose-200 rounded-lg p-2.5">
                       <p className="text-[11px] text-rose-600 flex items-center justify-center gap-1">
-                        <TrendingDown className="w-3 h-3" /> 僅 A 有
+                        <TrendingDown className="w-3 h-3" /> {t("snapshot.onlyInA")}
                       </p>
                       <p className="text-xl font-bold text-rose-700">{diff.onlyA.length}</p>
                     </div>
                     <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-2.5">
                       <p className="text-[11px] text-emerald-600 flex items-center justify-center gap-1">
-                        <TrendingUp className="w-3 h-3" /> 僅 B 有
+                        <TrendingUp className="w-3 h-3" /> {t("snapshot.onlyInB")}
                       </p>
                       <p className="text-xl font-bold text-emerald-700">{diff.onlyB.length}</p>
                     </div>
                     <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5">
                       <p className="text-[11px] text-amber-600 flex items-center justify-center gap-1">
-                        <ArrowLeftRight className="w-3 h-3" /> 狀態異動
+                        <ArrowLeftRight className="w-3 h-3" /> {t("snapshot.statusChanged")}
                       </p>
                       <p className="text-xl font-bold text-amber-700">{diff.changed.length}</p>
                     </div>
                     <div className="bg-gray-50 border border-gray-200 rounded-lg p-2.5">
                       <p className="text-[11px] text-gray-500 flex items-center justify-center gap-1">
-                        <Minus className="w-3 h-3" /> 相同
+                        <Minus className="w-3 h-3" /> {t("snapshot.unchanged")}
                       </p>
                       <p className="text-xl font-bold text-gray-700">{diff.unchanged}</p>
                     </div>
                   </div>
 
                   <DiffSection
-                    title="僅在 A 中"
+                    title={t("snapshot.onlyInASection")}
                     color="rose"
                     entries={diff.onlyA}
                     show={(d) => (
                       <span className="text-xs text-gray-600">
-                        {d.aStatus && statusLabel[d.aStatus]} · {d.aSubject && SUBJECT_LABELS[d.aSubject]} {d.aScore}
+                        {d.aStatus && statusLabel[d.aStatus]} · {d.aSubject && t(`subjects.${d.aSubject}`)} {d.aScore}
                       </span>
                     )}
                   />
                   <DiffSection
-                    title="僅在 B 中"
+                    title={t("snapshot.onlyInBSection")}
                     color="emerald"
                     entries={diff.onlyB}
                     show={(d) => (
                       <span className="text-xs text-gray-600">
-                        {d.bStatus && statusLabel[d.bStatus]} · {d.bSubject && SUBJECT_LABELS[d.bSubject]} {d.bScore}
+                        {d.bStatus && statusLabel[d.bStatus]} · {d.bSubject && t(`subjects.${d.bSubject}`)} {d.bScore}
                       </span>
                     )}
                   />
                   <DiffSection
-                    title="狀態異動"
+                    title={t("snapshot.statusChangedSection")}
                     color="amber"
                     entries={diff.changed}
                     show={(d) => (
@@ -439,7 +436,7 @@ export function FilterSnapshotDialog({ open, onClose, currentConfigs, currentRes
                 </div>
               ) : (
                 <div className="text-center text-gray-400 py-10 text-sm">
-                  請選擇兩個快照以比較差異
+                  {t("snapshot.selectTwoToCompare")}
                 </div>
               )}
             </div>
@@ -448,8 +445,8 @@ export function FilterSnapshotDialog({ open, onClose, currentConfigs, currentRes
               {snapshots.length === 0 ? (
                 <div className="p-10 text-center text-gray-400">
                   <Camera className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                  <p className="text-sm">尚無儲存的快照</p>
-                  <p className="text-xs mt-1">點擊「新快照」保存目前篩選結果以便日後比較</p>
+                  <p className="text-sm">{t("snapshot.empty")}</p>
+                  <p className="text-xs mt-1">{t("snapshot.emptyHint")}</p>
                 </div>
               ) : (
                 snapshots.map((s) => (
@@ -462,12 +459,12 @@ export function FilterSnapshotDialog({ open, onClose, currentConfigs, currentRes
                           {s.results.filter((r) => r.status !== "excluded").length}
                         </span>
                         <span className="text-xs text-gray-400">
-                          {s.configs.length} 條件
+                          {s.configs.length} {t("snapshot.conditions")}
                         </span>
                       </div>
                       {s.note && <p className="text-xs text-gray-500 mt-1">{s.note}</p>}
                       <p className="text-[11px] text-gray-400 mt-1">
-                        {new Date(s.createdAt).toLocaleString("zh-TW")}
+                        {new Date(s.createdAt).toLocaleString()}
                       </p>
                       <div className="mt-2 flex flex-wrap gap-1">
                         {s.configs.slice(0, 8).map((c, i) => (
@@ -475,8 +472,8 @@ export function FilterSnapshotDialog({ open, onClose, currentConfigs, currentRes
                             key={i}
                             className="text-[10px] bg-white border border-gray-200 rounded px-1.5 py-0.5 text-gray-600"
                           >
-                            {GRADE_LABELS[c.grade]?.replace("年級", "年") ?? c.grade}{SUBJECT_LABELS[c.subject]}
-                            {c.direction === "bottom" ? "後" : "前"}{c.value}{c.mode === "percent" ? "%" : "人"}
+                            {c.grade}{t("snapshot.yearUnit")}{t(`subjects.${c.subject}`)}
+                            {c.direction === "bottom" ? t("filter.bottom") : t("filter.top")}{c.value}{c.mode === "percent" ? t("filter.percentUnit") : t("filter.personUnit")}
                           </span>
                         ))}
                         {s.configs.length > 8 && (
@@ -487,7 +484,7 @@ export function FilterSnapshotDialog({ open, onClose, currentConfigs, currentRes
                     <button
                       onClick={() => deleteSnapshot(s.id)}
                       className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors flex-shrink-0 ml-3"
-                      title="刪除"
+                      title={t("actions.delete")}
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -513,6 +510,7 @@ function DiffSection({
   entries: DiffEntry[];
   show: (d: DiffEntry) => React.ReactNode;
 }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(entries.length > 0 && entries.length <= 20);
   if (entries.length === 0) return null;
 
@@ -529,7 +527,7 @@ function DiffSection({
         className={`w-full px-3 py-2 text-sm font-medium flex items-center justify-between ${colorMap[color].header}`}
       >
         <span>{title}（{entries.length}）</span>
-        <span className="text-xs">{expanded ? "收合" : "展開"}</span>
+        <span className="text-xs">{expanded ? t("snapshot.collapse") : t("snapshot.expand")}</span>
       </button>
       {expanded && (
         <ul className="max-h-64 overflow-y-auto divide-y divide-gray-100 bg-white">
@@ -541,8 +539,8 @@ function DiffSection({
               <div className="flex items-center gap-2 min-w-0">
                 <span className="font-medium text-gray-900 truncate">{d.name}</span>
                 <span className="text-gray-400 text-[11px] flex-shrink-0">
-                  {GRADE_LABELS[d.grade]?.replace("年級", "年") ?? d.grade}
-                  {d.cls ? `${d.cls}班` : ""}
+                  {d.grade}{t("snapshot.yearUnit")}
+                  {d.cls ? `${d.cls}${t("snapshot.classUnit")}` : ""}
                 </span>
               </div>
               {show(d)}

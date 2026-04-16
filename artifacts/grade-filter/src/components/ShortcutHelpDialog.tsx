@@ -1,19 +1,21 @@
 import { X, Keyboard } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
-const SHORTCUTS: { keys: string[]; desc: string }[] = [
-  { keys: ["Ctrl/⌘", "1"], desc: "跳至步驟一（匯入成績）" },
-  { keys: ["Ctrl/⌘", "2"], desc: "跳至步驟二（設定篩選）" },
-  { keys: ["Ctrl/⌘", "3"], desc: "跳至步驟三（查看結果）" },
-  { keys: ["Ctrl/⌘", "E"], desc: "快速匯出 Excel（於結果頁）" },
-  { keys: ["Ctrl/⌘", "P"], desc: "列印結果（於結果頁）" },
-  { keys: ["Ctrl/⌘", "F"], desc: "聚焦搜尋框" },
-  { keys: ["Ctrl", "Shift", "R"], desc: "重新執行篩選" },
-  { keys: ["Ctrl/⌘", "Z"], desc: "撤銷（於篩選設定頁）" },
-  { keys: ["Ctrl/⌘", "Shift", "Z"], desc: "還原（於篩選設定頁）" },
-  { keys: ["?"], desc: "顯示此快捷鍵說明" },
+const SHORTCUT_KEYS: { keys: string[]; descKey: string }[] = [
+  { keys: ["Ctrl/⌘", "1"], descKey: "shortcuts.goStep1" },
+  { keys: ["Ctrl/⌘", "2"], descKey: "shortcuts.goStep2" },
+  { keys: ["Ctrl/⌘", "3"], descKey: "shortcuts.goStep3" },
+  { keys: ["Ctrl/⌘", "E"], descKey: "shortcuts.exportExcel" },
+  { keys: ["Ctrl/⌘", "P"], descKey: "shortcuts.print" },
+  { keys: ["Ctrl/⌘", "F"], descKey: "shortcuts.focusSearch" },
+  { keys: ["Ctrl", "Shift", "R"], descKey: "shortcuts.rerunFilter" },
+  { keys: ["Ctrl/⌘", "Z"], descKey: "shortcuts.undo" },
+  { keys: ["Ctrl/⌘", "Shift", "Z"], descKey: "shortcuts.redo" },
+  { keys: ["?"], descKey: "shortcuts.showHelp" },
 ];
 
 export function ShortcutHelpDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t } = useTranslation();
   if (!open) return null;
   return (
     <div
@@ -27,7 +29,7 @@ export function ShortcutHelpDialog({ open, onClose }: { open: boolean; onClose: 
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Keyboard className="w-5 h-5 text-blue-600" />
-            <h2 className="font-bold text-gray-900">鍵盤快捷鍵</h2>
+            <h2 className="font-bold text-gray-900">{t("shortcuts.dialogTitle")}</h2>
           </div>
           <button
             onClick={onClose}
@@ -37,9 +39,9 @@ export function ShortcutHelpDialog({ open, onClose }: { open: boolean; onClose: 
           </button>
         </div>
         <div className="p-5 space-y-2">
-          {SHORTCUTS.map((s, i) => (
+          {SHORTCUT_KEYS.map((s, i) => (
             <div key={i} className="flex items-center justify-between text-sm">
-              <span className="text-gray-700">{s.desc}</span>
+              <span className="text-gray-700">{t(s.descKey)}</span>
               <div className="flex gap-1">
                 {s.keys.map((k, j) => (
                   <kbd
@@ -54,7 +56,7 @@ export function ShortcutHelpDialog({ open, onClose }: { open: boolean; onClose: 
           ))}
         </div>
         <div className="px-5 py-3 bg-gray-50/70 border-t border-gray-100 text-xs text-gray-500">
-          提示：在輸入欄位中部分快捷鍵會暫時停用，以免干擾輸入
+          {t("shortcuts.hint")}
         </div>
       </div>
     </div>

@@ -8,8 +8,9 @@
  * Mobile 下直接回退為卡片式虛擬列表（重用 ResultCard 的視覺）。
  */
 import { useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { FilterResult, Subject, SUBJECT_LABELS, GRADE_LABELS } from "../types";
+import { FilterResult, Subject } from "../types";
 import { ChevronDown, ChevronUp, Star, UserX } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -34,17 +35,17 @@ const DESKTOP_GRID =
   "[status] 96px [name] 1fr [grade] 80px [class] 80px [seat] 72px [id] 156px " +
   "[chinese] 72px [english] 72px [math] 72px [filterSub] 96px";
 
-const TABLE_COLS: { key: SortKey; label: string; align?: "left" | "right" | "center" }[] = [
-  { key: "status", label: "狀態" },
-  { key: "name", label: "姓名" },
-  { key: "grade", label: "年級" },
-  { key: "class", label: "班級" },
-  { key: "seatNo", label: "座號" },
-  { key: "idNumber", label: "身分證字號" },
-  { key: "chinese", label: "國文", align: "center" },
-  { key: "english", label: "英文", align: "center" },
-  { key: "math", label: "數學", align: "center" },
-  { key: "filterSubject", label: "篩選科目" },
+const TABLE_COLS: { key: SortKey; labelKey: string; align?: "left" | "right" | "center" }[] = [
+  { key: "status", labelKey: "result.colStatus" },
+  { key: "name", labelKey: "result.colName" },
+  { key: "grade", labelKey: "result.colGrade" },
+  { key: "class", labelKey: "result.colClass" },
+  { key: "seatNo", labelKey: "result.colSeat" },
+  { key: "idNumber", labelKey: "result.colIdNumber" },
+  { key: "chinese", labelKey: "subjects.chinese", align: "center" },
+  { key: "english", labelKey: "subjects.english", align: "center" },
+  { key: "math", labelKey: "subjects.math", align: "center" },
+  { key: "filterSubject", labelKey: "result.colFilterSubject" },
 ];
 
 export function VirtualResultList({
@@ -54,6 +55,7 @@ export function VirtualResultList({
   sortDir,
   onToggleSort,
 }: Props) {
+  const { t } = useTranslation();
   const parentRef = useRef<HTMLDivElement | null>(null);
 
   const rowHeight = isMobile ? MOBILE_ROW_HEIGHT : DESKTOP_ROW_HEIGHT;
@@ -96,7 +98,7 @@ export function VirtualResultList({
               )}
               onClick={() => onToggleSort(c.key)}
             >
-              <span>{c.label}</span>
+              <span>{t(c.labelKey)}</span>
               <SortIcon k={c.key} />
             </button>
           ))}
@@ -139,6 +141,7 @@ export function VirtualResultList({
 }
 
 function VirtualRow({ r }: { r: FilterResult }) {
+  const { t } = useTranslation();
   return (
     <div
       className={cn(
@@ -156,21 +159,21 @@ function VirtualRow({ r }: { r: FilterResult }) {
       <div className="px-4 py-3">
         {r.status === "priority" ? (
           <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-100 rounded-full px-2 py-0.5">
-            <Star className="w-3 h-3 fill-amber-500 text-amber-500" />優先
+            <Star className="w-3 h-3 fill-amber-500 text-amber-500" />{t("status.priority")}
           </span>
         ) : r.status === "excluded" ? (
           <span className="inline-flex items-center gap-1 text-xs font-semibold text-gray-500 bg-gray-100 rounded-full px-2 py-0.5">
-            <UserX className="w-3 h-3" />已排除
+            <UserX className="w-3 h-3" />{t("result.excluded")}
           </span>
         ) : (
-          <span className="text-xs font-semibold text-blue-700 bg-blue-50 rounded-full px-2 py-0.5">一般</span>
+          <span className="text-xs font-semibold text-blue-700 bg-blue-50 rounded-full px-2 py-0.5">{t("status.normal")}</span>
         )}
       </div>
       <div className={cn("px-4 py-3 font-medium truncate", r.status === "excluded" ? "text-gray-400" : "text-gray-900")}>
         {r.name || "—"}
       </div>
       <div className="px-4 py-3 text-gray-500 text-xs truncate">
-        {r.grade ? (GRADE_LABELS[r.grade] || `${r.grade}年級`) : "—"}
+        {r.grade ? t(`grades.g${r.grade}`, { defaultValue: `${r.grade}` }) : "—"}
       </div>
       <div className="px-4 py-3 text-gray-500 text-xs truncate">{r.class || "—"}</div>
       <div className="px-4 py-3 text-gray-500 text-xs truncate">{r.seatNo || "—"}</div>
@@ -188,7 +191,7 @@ function VirtualRow({ r }: { r: FilterResult }) {
       </div>
       <div className="px-4 py-3">
         <span className="text-xs font-medium text-gray-600 bg-gray-100 rounded-full px-2 py-0.5">
-          {SUBJECT_LABELS[r.filterSubject]}
+          {t(`subjects.${r.filterSubject}`)}
         </span>
       </div>
     </div>
@@ -196,18 +199,19 @@ function VirtualRow({ r }: { r: FilterResult }) {
 }
 
 function VirtualCard({ r }: { r: FilterResult }) {
+  const { t } = useTranslation();
   const subjects: Subject[] = ["chinese", "english", "math"];
   const statusBadge =
     r.status === "priority" ? (
       <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-100 rounded-full px-2 py-0.5">
-        <Star className="w-3 h-3 fill-amber-500 text-amber-500" />優先
+        <Star className="w-3 h-3 fill-amber-500 text-amber-500" />{t("status.priority")}
       </span>
     ) : r.status === "excluded" ? (
       <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-gray-500 bg-gray-100 rounded-full px-2 py-0.5">
-        <UserX className="w-3 h-3" />已排除
+        <UserX className="w-3 h-3" />{t("result.excluded")}
       </span>
     ) : (
-      <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 rounded-full px-2 py-0.5">一般</span>
+      <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 rounded-full px-2 py-0.5">{t("status.normal")}</span>
     );
 
   return (
@@ -229,14 +233,14 @@ function VirtualCard({ r }: { r: FilterResult }) {
             {statusBadge}
           </div>
           <p className="text-xs text-gray-500">
-            {r.grade ? (GRADE_LABELS[r.grade] || `${r.grade}年級`) : "—"}
-            {r.class && <> · {r.class}班</>}
-            {r.seatNo && <> · {r.seatNo}號</>}
+            {r.grade ? t(`grades.g${r.grade}`, { defaultValue: `${r.grade}` }) : "—"}
+            {r.class && <> · {r.class}{t("result.classUnit")}</>}
+            {r.seatNo && <> · {r.seatNo}{t("result.seatUnit")}</>}
           </p>
           <p className="text-[11px] font-mono text-gray-400 mt-0.5 truncate">{r.idNumber}</p>
         </div>
         <span className="text-[11px] font-medium text-gray-600 bg-gray-100 rounded-full px-2 py-0.5 flex-shrink-0">
-          {SUBJECT_LABELS[r.filterSubject]}
+          {t(`subjects.${r.filterSubject}`)}
         </span>
       </div>
       <div className="grid grid-cols-3 gap-2 mt-2">
@@ -251,7 +255,7 @@ function VirtualCard({ r }: { r: FilterResult }) {
                 isFilter ? "bg-blue-50 border-blue-200" : "bg-gray-50/60 border-gray-100"
               )}
             >
-              <p className="text-[10px] text-gray-500">{SUBJECT_LABELS[sub]}</p>
+              <p className="text-[10px] text-gray-500">{t(`subjects.${sub}`)}</p>
               <p className={cn(
                 "text-sm font-bold",
                 r.status === "excluded" ? "text-gray-400"

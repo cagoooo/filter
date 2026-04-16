@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ChevronDown, ChevronUp, RefreshCw, CheckCircle, AlertCircle,
   AlertTriangle, BarChart2, Copy, Save, Trash2, Sparkles,
 } from "lucide-react";
-import { Subject, SUBJECT_LABELS, Student, ExcelProfile } from "../types";
+import { Subject, Student, ExcelProfile } from "../types";
 import { ColumnMapping, remapStudents, DuplicateGroup, ScoreAnomaly, GradeScoreStat } from "../lib/excel";
 import { storageGet, storageSet, STORAGE_KEYS } from "../lib/storage";
 import { toast } from "sonner";
@@ -21,13 +22,13 @@ interface Props {
   onDeduplicated?: (students: Student[]) => void;
 }
 
-const FIELD_LABELS: Record<keyof Pick<ColumnMapping, "nameIdx" | "gradeIdx" | "classIdx" | "seatIdx" | "idIdx" | "scoreIdx">, string> = {
-  nameIdx: "姓名",
-  gradeIdx: "年級 / 班級代碼",
-  classIdx: "班級",
-  seatIdx: "座號",
-  idIdx: "身分證字號",
-  scoreIdx: "成績",
+const fieldLabelsKeys: Record<keyof Pick<ColumnMapping, "nameIdx" | "gradeIdx" | "classIdx" | "seatIdx" | "idIdx" | "scoreIdx">, string> = {
+  nameIdx: "upload.fieldName",
+  gradeIdx: "upload.fieldGrade",
+  classIdx: "upload.fieldClass",
+  seatIdx: "upload.fieldSeat",
+  idIdx: "upload.fieldId",
+  scoreIdx: "upload.fieldScore",
 };
 
 const REQUIRED_FIELDS: (keyof Pick<ColumnMapping, "nameIdx" | "gradeIdx" | "classIdx" | "seatIdx" | "idIdx" | "scoreIdx">)[] = [
@@ -39,6 +40,7 @@ export default function UploadPreview({
   duplicates, anomalies, gradeStats,
   onRemapped, onDeduplicated,
 }: Props) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [manualExpanded, setManualExpanded] = useState(false);
   const [localMapping, setLocalMapping] = useState<ColumnMapping>(mapping);
@@ -64,7 +66,7 @@ export default function UploadPreview({
   const highBlankGrades = gradeStats.filter((g) => g.blankRate > 0.3);
 
   // P2.1: 關鍵欄位置信度低 → 提醒使用者檢查
-  const CRITICAL_FIELDS: (keyof typeof FIELD_LABELS)[] = ["nameIdx", "idIdx", "scoreIdx"];
+  const CRITICAL_FIELDS: (keyof typeof fieldLabelsKeys)[] = ["nameIdx", "idIdx", "scoreIdx"];
   const lowConfidenceFields = CRITICAL_FIELDS.filter((f) => {
     const idx = mapping[f];
     if (idx === -1) return false;
@@ -109,7 +111,7 @@ export default function UploadPreview({
 
   const saveProfile = async () => {
     if (!newProfileName.trim()) {
-      toast.error("請輸入 Profile 名稱");
+      toast.error(t("upload.profileNameRequired"));
       return;
     }
     const prof: ExcelProfile = {
@@ -133,7 +135,7 @@ export default function UploadPreview({
     setProfiles(next);
     setNewProfileName("");
     setProfileFormOpen(false);
-    toast.success(`已儲存欄位 Profile「${prof.name}」`);
+    toast.success(t("upload.profileSaved", { name: prof.name }));
   };
 
   const applyProfile = async (profileId: string) => {
@@ -159,22 +161,22 @@ export default function UploadPreview({
     const next = profiles.map((p) => (p.id === profileId ? { ...p, lastUsedAt: Date.now() } : p));
     await storageSet(STORAGE_KEYS.EXCEL_PROFILES, next);
     setProfiles(next);
-    toast.success(`已套用 Profile「${prof.name}」`);
+    toast.success(t("upload.profileApplied", { name: prof.name }));
   };
 
   const deleteProfile = async (profileId: string) => {
     const prof = profiles.find((p) => p.id === profileId);
     if (!prof) return;
-    if (!confirm(`確定刪除 Profile「${prof.name}」？`)) return;
+    if (!confirm(t("upload.confirmDeleteProfile", { name: prof.name }))) return;
     const next = profiles.filter((p) => p.id !== profileId);
     await storageSet(STORAGE_KEYS.EXCEL_PROFILES, next);
     setProfiles(next);
-    toast.success("已刪除");
+    toast.success(t("upload.deleted"));
   };
 
   const colOptions = [
-    { value: -1, label: "（未選取）" },
-    ...colLabels.map((label, i) => ({ value: i, label: `第${i + 1}欄 「${label.slice(0, 8)}」` })),
+    { value: -1, label: t("upload.notSelected") },
+    ...colLabels.map((label, i) => ({ value: i, label: t("upload.columnLabel", { n: i + 1, label: label.slice(0, 8) }) })),
   ];
 
   /** 依據置信度挑選顏色。>= 0.85 綠、>= 0.60 黃、其他 橘（低置信但有偵測）*/
@@ -189,7 +191,7 @@ export default function UploadPreview({
       return {
         bg: "bg-green-50 text-green-700 border-green-200",
         icon: <CheckCircle className="w-3 h-3" />,
-        tierLabel: "高",
+        tierLabel: t("upload.confidenceHigh"),
         tierColor: "bg-green-100 text-green-700",
       };
     }
@@ -197,14 +199,14 @@ export default function UploadPreview({
       return {
         bg: "bg-amber-50 text-amber-800 border-amber-200",
         icon: <AlertTriangle className="w-3 h-3" />,
-        tierLabel: "中",
+        tierLabel: t("upload.confidenceMed"),
         tierColor: "bg-amber-100 text-amber-700",
       };
     }
     return {
       bg: "bg-orange-50 text-orange-800 border-orange-200",
       icon: <AlertTriangle className="w-3 h-3" />,
-      tierLabel: "低",
+      tierLabel: t("upload.confidenceLow"),
       tierColor: "bg-orange-100 text-orange-700",
     };
   };
@@ -225,7 +227,7 @@ export default function UploadPreview({
           "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border",
           found ? style.bg : "bg-red-50 text-red-600 border-red-200"
         )}
-        title={found ? `置信度：${confPct}% (${style.tierLabel})` : "未偵測到"}
+        title={found ? t("upload.confidenceLabel", { pct: confPct, tier: style.tierLabel }) : t("upload.notDetected")}
       >
         {found ? style.icon : <AlertCircle className="w-3 h-3" />}
         {label}
@@ -233,8 +235,8 @@ export default function UploadPreview({
           <span className="text-xs opacity-70">
             :{" "}
             {field === "gradeIdx" && mapping.gradeFromClass
-              ? `${colLabels[idx] ?? `第${idx + 1}欄`}（班級代碼）`
-              : colLabels[idx] ?? `第${idx + 1}欄`}
+              ? `${colLabels[idx] ?? `${t("upload.columnLabel", { n: idx + 1, label: "" })}`}${t("upload.classCodeNote")}`
+              : colLabels[idx] ?? t("upload.columnLabel", { n: idx + 1, label: "" })}
           </span>
         )}
         {found && conf !== undefined && (
@@ -242,7 +244,7 @@ export default function UploadPreview({
             {confPct}%
           </span>
         )}
-        {!found && <span className="opacity-70">: 未偵測到</span>}
+        {!found && <span className="opacity-70">: {t("upload.notDetected")}</span>}
       </span>
     );
   };
@@ -254,11 +256,11 @@ export default function UploadPreview({
         onClick={() => setExpanded((p) => !p)}
       >
         <span className="flex items-center gap-2">
-          欄位辨識結果與資料預覽（共 {students.length} 筆）
+          {t("upload.previewTitle", { count: students.length })}
           {alertCount > 0 && !dupResolved && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 border border-amber-300 rounded-full text-xs font-semibold">
               <AlertTriangle className="w-3 h-3" />
-              {alertCount} 項警示
+              {t("upload.alertCount", { count: alertCount })}
             </span>
           )}
         </span>
@@ -274,20 +276,20 @@ export default function UploadPreview({
                 <AlertTriangle className="w-4 h-4 text-orange-600 flex-shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-semibold text-orange-800">
-                    部分欄位偵測置信度偏低（可能誤判），建議人工核對
+                    {t("upload.lowConfidenceWarning")}
                   </p>
                   <ul className="mt-1 text-xs text-orange-700 space-y-0.5">
                     {lowConfidenceFields.map((f) => {
                       const c = mapping.confidence?.[f] ?? 0;
                       return (
                         <li key={f}>
-                          • {FIELD_LABELS[f]}：置信度 {Math.round(c * 100)}%
+                          {t("upload.confidenceField", { field: t(fieldLabelsKeys[f]), pct: Math.round(c * 100) })}
                         </li>
                       );
                     })}
                   </ul>
                   <p className="mt-1 text-xs text-orange-600 italic">
-                    可使用下方「手動調整欄位對應」確認。
+                    {t("upload.manualMappingHint")}
                   </p>
                 </div>
               </div>
@@ -300,13 +302,13 @@ export default function UploadPreview({
                 <Copy className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-semibold text-amber-800 mb-1.5">
-                    發現 {duplicates.length} 筆重複的身分證字號
+                    {t("upload.duplicatesFound", { count: duplicates.length })}
                   </p>
                   <div className="space-y-1 mb-2">
                     {duplicates.map((d) => (
                       <p key={d.idNumber} className="text-xs text-amber-700">
-                        ⚠ {d.name}（{d.idNumber.slice(0, 4)}****）
-                        共 {d.count} 筆，出現於第 {d.rows.join("、")} 行
+                        ⚠ {d.name}({d.idNumber.slice(0, 4)}****)
+                        {t("upload.duplicateDetail", { count: d.count, rows: d.rows.join(", ") })}
                       </p>
                     ))}
                   </div>
@@ -315,13 +317,13 @@ export default function UploadPreview({
                       onClick={handleKeepHighest}
                       className="px-3 py-1 text-xs font-medium bg-amber-600 text-white rounded-md hover:bg-amber-700 transition-colors"
                     >
-                      保留各人成績最高的一筆
+                      {t("upload.keepHighest")}
                     </button>
                     <button
                       onClick={() => setDupResolved(true)}
                       className="px-3 py-1 text-xs font-medium text-amber-700 border border-amber-300 rounded-md hover:bg-amber-100 transition-colors"
                     >
-                      忽略，繼續使用
+                      {t("upload.ignoreContinue")}
                     </button>
                   </div>
                 </div>
@@ -332,7 +334,7 @@ export default function UploadPreview({
           {dupResolved && hasDuplicates && (
             <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 flex items-center gap-2 text-xs text-green-700">
               <CheckCircle className="w-3.5 h-3.5 flex-shrink-0" />
-              重複問題已處理，每位學生保留成績最高的一筆
+              {t("upload.duplicatesResolved")}
             </div>
           )}
 
@@ -340,25 +342,24 @@ export default function UploadPreview({
             <div className="rounded-lg border border-orange-200 bg-orange-50 p-3 space-y-2">
               <div className="flex items-center gap-2">
                 <BarChart2 className="w-4 h-4 text-orange-600 flex-shrink-0" />
-                <p className="text-xs font-semibold text-orange-800">成績資料異常偵測</p>
+                <p className="text-xs font-semibold text-orange-800">{t("upload.anomalyDetection")}</p>
               </div>
               {hasAnomalies && (
                 <div>
-                  <p className="text-xs text-orange-700 font-medium mb-1">異常分數（超出 0–150 範圍）：</p>
+                  <p className="text-xs text-orange-700 font-medium mb-1">{t("upload.anomalyScoreRange")}</p>
                   {anomalies.map((a, i) => (
                     <p key={i} className="text-xs text-orange-700">
-                      • {a.name} — {a.score} 分（第 {a.row} 行）
+                      {t("upload.anomalyScoreDetail", { name: a.name, score: a.score, row: a.row })}
                     </p>
                   ))}
                 </div>
               )}
               {highBlankGrades.length > 0 && (
                 <div>
-                  <p className="text-xs text-orange-700 font-medium mb-1">空白成績比例過高（超過 30%）：</p>
+                  <p className="text-xs text-orange-700 font-medium mb-1">{t("upload.highBlankRate")}</p>
                   {highBlankGrades.map((g) => (
                     <p key={g.grade} className="text-xs text-orange-700">
-                      • {g.grade} 年級：共 {g.total} 筆，其中 {g.missing} 筆空白
-                      （{(g.blankRate * 100).toFixed(1)}%），請確認資料完整性
+                      {t("upload.blankRateDetail", { grade: g.grade, total: g.total, missing: g.missing, rate: (g.blankRate * 100).toFixed(1) })}
                     </p>
                   ))}
                 </div>
@@ -370,7 +371,7 @@ export default function UploadPreview({
             <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
               <p className="text-xs font-medium text-gray-600 mb-1.5 flex items-center gap-1">
                 <BarChart2 className="w-3.5 h-3.5" />
-                各年級成績統計
+                {t("upload.gradeStatTitle")}
               </p>
               <div className="flex flex-wrap gap-x-4 gap-y-1">
                 {gradeStats.map((g) => (
@@ -381,8 +382,8 @@ export default function UploadPreview({
                       g.blankRate > 0.3 ? "text-orange-600 font-medium" : "text-gray-600"
                     )}
                   >
-                    {g.grade} 年級：{g.total} 筆
-                    {g.missing > 0 && `，空白 ${g.missing} 筆 (${(g.blankRate * 100).toFixed(0)}%)`}
+                    {t("upload.gradeStatSummary", { grade: g.grade, total: g.total })}
+                    {g.missing > 0 && `, ${t("upload.blankRateDetail", { grade: g.grade, total: g.total, missing: g.missing, rate: (g.blankRate * 100).toFixed(0) })}`}
                   </span>
                 ))}
               </div>
@@ -390,17 +391,17 @@ export default function UploadPreview({
           )}
 
           <div className="flex flex-wrap gap-2 pt-1">
-            {fieldBadge("gradeIdx", "年級", mapping.gradeIdx)}
-            {fieldBadge("classIdx", "班級", mapping.classIdx)}
-            {fieldBadge("nameIdx", "姓名", mapping.nameIdx)}
-            {fieldBadge("scoreIdx", `${SUBJECT_LABELS[subject]}成績`, mapping.scoreIdx)}
-            {fieldBadge("idIdx", "身分證字號", mapping.idIdx)}
-            {fieldBadge("seatIdx", "座號", mapping.seatIdx)}
+            {fieldBadge("gradeIdx", t("upload.thGrade"), mapping.gradeIdx)}
+            {fieldBadge("classIdx", t("upload.thClass"), mapping.classIdx)}
+            {fieldBadge("nameIdx", t("upload.thName"), mapping.nameIdx)}
+            {fieldBadge("scoreIdx", t("upload.scoreLabel", { subject: t(`subjects.${subject}`) }), mapping.scoreIdx)}
+            {fieldBadge("idIdx", t("upload.thIdNumber"), mapping.idIdx)}
+            {fieldBadge("seatIdx", t("upload.thSeat"), mapping.seatIdx)}
           </div>
 
           {mapping.gradeFromClass && (
             <p className="text-xs text-blue-600 bg-blue-50 rounded px-3 py-1.5 border border-blue-100">
-              年級從班級代碼自動拆解：例如「203」= 2年級3班
+              {t("upload.gradeFromClassHint")}
             </p>
           )}
 
@@ -410,7 +411,7 @@ export default function UploadPreview({
               onClick={() => setManualExpanded((p) => !p)}
             >
               {manualExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-              手動調整欄位對應
+              {t("upload.manualMapping")}
             </button>
 
             {manualExpanded && (
@@ -421,7 +422,7 @@ export default function UploadPreview({
                     <div className="flex items-center gap-1.5">
                       <Sparkles className="w-3.5 h-3.5 text-violet-600" />
                       <span className="text-xs font-semibold text-violet-800">
-                        欄位對應 Profile（{profiles.length}）
+                        {t("upload.profileTitle", { count: profiles.length })}
                       </span>
                     </div>
                     <button
@@ -430,7 +431,7 @@ export default function UploadPreview({
                       className="flex items-center gap-1 text-xs text-violet-700 hover:text-violet-900 font-medium"
                     >
                       <Save className="w-3 h-3" />
-                      {profileFormOpen ? "取消" : "儲存目前設定"}
+                      {profileFormOpen ? t("upload.cancelSave") : t("upload.saveCurrentSettings")}
                     </button>
                   </div>
 
@@ -440,7 +441,7 @@ export default function UploadPreview({
                         type="text"
                         value={newProfileName}
                         onChange={(e) => setNewProfileName(e.target.value)}
-                        placeholder="例如：校務系統匯出格式"
+                        placeholder={t("upload.profilePlaceholder")}
                         className="flex-1 text-xs border border-violet-200 rounded-md px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500"
                         onKeyDown={(e) => {
                           if (e.key === "Enter") {
@@ -454,14 +455,14 @@ export default function UploadPreview({
                         onClick={saveProfile}
                         className="px-3 py-1.5 bg-violet-600 text-white text-xs font-medium rounded-md hover:bg-violet-700 transition-colors"
                       >
-                        儲存
+                        {t("actions.save")}
                       </button>
                     </div>
                   )}
 
                   {profiles.length === 0 ? (
                     <p className="text-xs text-violet-600/80 italic">
-                      尚未儲存任何 Profile。調整欄位對應後，可命名儲存以供下次匯入同格式檔案時一鍵套用。
+                      {t("upload.noProfilesHint")}
                     </p>
                   ) : (
                     <div className="space-y-1">
@@ -473,8 +474,8 @@ export default function UploadPreview({
                           <div className="flex-1 min-w-0">
                             <p className="text-xs font-medium text-gray-800 truncate">{p.name}</p>
                             <p className="text-[10px] text-gray-500 truncate" title={p.headerSignature.join(" | ")}>
-                              表頭：{p.headerSignature.filter(Boolean).slice(0, 4).join("、") || "（無）"}
-                              {p.lastUsedAt && ` · 最近使用：${new Date(p.lastUsedAt).toLocaleDateString()}`}
+                              {t("upload.profileHeader")}{p.headerSignature.filter(Boolean).slice(0, 4).join(", ") || t("upload.profileNone")}
+                              {p.lastUsedAt && ` · ${t("upload.profileLastUsed")}${new Date(p.lastUsedAt).toLocaleDateString()}`}
                             </p>
                           </div>
                           <button
@@ -482,13 +483,13 @@ export default function UploadPreview({
                             onClick={() => applyProfile(p.id)}
                             className="px-2 py-1 text-[11px] font-medium text-violet-700 border border-violet-300 rounded hover:bg-violet-100 transition-colors whitespace-nowrap"
                           >
-                            套用
+                            {t("actions.apply")}
                           </button>
                           <button
                             type="button"
                             onClick={() => deleteProfile(p.id)}
                             className="p-1 text-gray-400 hover:text-red-600 transition-colors"
-                            title="刪除 Profile"
+                            title={t("upload.deleteProfile")}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -502,10 +503,10 @@ export default function UploadPreview({
                   {REQUIRED_FIELDS.map((field) => (
                     <div key={field}>
                       <label className="block text-xs font-medium text-gray-600 mb-1">
-                        {FIELD_LABELS[field]}
+                        {t(fieldLabelsKeys[field])}
                         {field === "gradeIdx" && (
                           <span className="font-normal text-gray-400 ml-1">
-                            （可選班級代碼欄，系統自動拆解年級）
+                            {t("upload.gradeFromClassNote")}
                           </span>
                         )}
                       </label>
@@ -532,7 +533,7 @@ export default function UploadPreview({
                       className="rounded"
                     />
                     <label htmlFor={`gradeFromClass-${subject}`} className="text-xs text-gray-600">
-                      年級欄的值是三位數班級代碼（如 203）
+                      {t("upload.threeDigitClassCode")}
                     </label>
                   </div>
                   <button
@@ -540,7 +541,7 @@ export default function UploadPreview({
                     className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-md hover:bg-blue-700 transition-colors"
                   >
                     <RefreshCw className="w-3 h-3" />
-                    重新套用
+                    {t("upload.reapply")}
                   </button>
                 </div>
 
@@ -556,36 +557,36 @@ export default function UploadPreview({
           {preview.length > 0 ? (
             <div>
               <p className="text-xs font-medium text-gray-600 mb-1.5">
-                資料預覽（前 {preview.length} 筆）
+                {t("upload.previewLabel", { count: preview.length })}
               </p>
               <div className="overflow-x-auto rounded-lg border border-gray-200">
                 <table className="w-full text-xs">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-3 py-2 text-left text-gray-600 font-medium whitespace-nowrap">年級</th>
-                      <th className="px-3 py-2 text-left text-gray-600 font-medium whitespace-nowrap">班級</th>
-                      <th className="px-3 py-2 text-left text-gray-600 font-medium whitespace-nowrap">座號</th>
-                      <th className="px-3 py-2 text-left text-gray-600 font-medium whitespace-nowrap">姓名</th>
+                      <th className="px-3 py-2 text-left text-gray-600 font-medium whitespace-nowrap">{t("upload.thGrade")}</th>
+                      <th className="px-3 py-2 text-left text-gray-600 font-medium whitespace-nowrap">{t("upload.thClass")}</th>
+                      <th className="px-3 py-2 text-left text-gray-600 font-medium whitespace-nowrap">{t("upload.thSeat")}</th>
+                      <th className="px-3 py-2 text-left text-gray-600 font-medium whitespace-nowrap">{t("upload.thName")}</th>
                       <th className="px-3 py-2 text-right text-gray-600 font-medium whitespace-nowrap">
-                        {SUBJECT_LABELS[subject]}成績
+                        {t("upload.scoreLabel", { subject: t(`subjects.${subject}`) })}
                       </th>
-                      <th className="px-3 py-2 text-left text-gray-600 font-medium whitespace-nowrap">身分證字號</th>
+                      <th className="px-3 py-2 text-left text-gray-600 font-medium whitespace-nowrap">{t("upload.thIdNumber")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {preview.map((s, i) => (
                       <tr key={i} className="hover:bg-gray-50/50">
-                        <td className="px-3 py-1.5 text-gray-700">{s.grade || "—"}</td>
-                        <td className="px-3 py-1.5 text-gray-700">{s.class || "—"}</td>
-                        <td className="px-3 py-1.5 text-gray-700">{s.seatNo || "—"}</td>
-                        <td className="px-3 py-1.5 font-medium text-gray-900">{s.name || "—"}</td>
+                        <td className="px-3 py-1.5 text-gray-700">{s.grade || "\u2014"}</td>
+                        <td className="px-3 py-1.5 text-gray-700">{s.class || "\u2014"}</td>
+                        <td className="px-3 py-1.5 text-gray-700">{s.seatNo || "\u2014"}</td>
+                        <td className="px-3 py-1.5 font-medium text-gray-900">{s.name || "\u2014"}</td>
                         <td className="px-3 py-1.5 text-right font-mono text-blue-700">
-                          {s[subject] != null ? s[subject] : "—"}
+                          {s[subject] != null ? s[subject] : "\u2014"}
                         </td>
                         <td className="px-3 py-1.5 font-mono text-gray-600">
                           {s.idNumber
                             ? s.idNumber.slice(0, 4) + "****" + s.idNumber.slice(-2)
-                            : "—"}
+                            : "\u2014"}
                         </td>
                       </tr>
                     ))}
@@ -594,7 +595,7 @@ export default function UploadPreview({
               </div>
             </div>
           ) : (
-            <p className="text-xs text-gray-500">（無法產生預覽，請確認欄位對應）</p>
+            <p className="text-xs text-gray-500">{t("upload.noPreview")}</p>
           )}
         </div>
       )}

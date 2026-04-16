@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useFilterContext } from "../context/AppContext";
-import { FilterResult, Subject, SUBJECT_LABELS, GRADE_LABELS } from "../types";
+import { FilterResult, Subject } from "../types";
 import { exportToExcel, exportToCsv } from "../lib/excel";
 import {
   ArrowLeft, FileSpreadsheet, FileText, Star, Users,
@@ -23,26 +24,27 @@ type SortDir = "asc" | "desc";
 type ViewMode = "list" | "grouped";
 
 export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; onReset: () => void }) {
+  const { t } = useTranslation();
   const { filterResults, filterConfigs } = useFilterContext();
   const [snapshotOpen, setSnapshotOpen] = useState(false);
   const isMobile = useIsMobile();
 
   const handleExport = () => {
     if (filterResults.length === 0) {
-      toast.error("沒有資料可匯出");
+      toast.error(t("result.noDataToExport"));
       return;
     }
     try {
-      exportToExcel(exportData(true), "篩選結果.xlsx");
-      toast.success(`已匯出 ${filterResults.length} 筆資料`);
+      exportToExcel(exportData(true), t("result.exportFilename"));
+      toast.success(t("result.exported", { count: filterResults.length }));
     } catch {
-      toast.error("匯出失敗");
+      toast.error(t("result.exportFailed"));
     }
   };
 
   const handlePrint = () => {
     if (filterResults.length === 0) {
-      toast.error("沒有資料可列印");
+      toast.error(t("result.noDataToPrint"));
       return;
     }
     window.print();
@@ -80,8 +82,8 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
         const bVal = b[sortKey as keyof FilterResult] ?? "";
         if (typeof aVal === "number" && typeof bVal === "number") return sortDir === "asc" ? aVal - bVal : bVal - aVal;
         return sortDir === "asc"
-          ? String(aVal).localeCompare(String(bVal), "zh-TW")
-          : String(bVal).localeCompare(String(aVal), "zh-TW");
+          ? String(aVal).localeCompare(String(bVal))
+          : String(bVal).localeCompare(String(aVal));
       });
     }
     return data;
@@ -93,12 +95,12 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
       const ga = a.grade || 0;
       const gb = b.grade || 0;
       if (ga !== gb) return ga - gb;
-      return String(a.class ?? "").localeCompare(String(b.class ?? ""), "zh-TW");
+      return String(a.class ?? "").localeCompare(String(b.class ?? ""));
     });
     for (const r of sorted) {
       // 空值保護：避免產生 "undefined-undefined" 之類的 key
-      const gradeKey = r.grade || "未知";
-      const classKey = r.class && String(r.class).trim() ? r.class : "未知";
+      const gradeKey = r.grade || "unknown";
+      const classKey = r.class && String(r.class).trim() ? r.class : "unknown";
       const key = `${gradeKey}-${classKey}`;
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(r);
@@ -119,17 +121,17 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
   const exportData = (includeExcluded = false) => {
     const rows = filterResults.filter((r) => r.status !== "excluded" || includeExcluded);
     return rows.map((r) => ({
-      狀態: r.status === "priority" ? "優先" : r.status === "excluded" ? "已排除（特生）" : "一般",
-      姓名: r.name,
-      年級: GRADE_LABELS[r.grade] || r.grade,
-      班級: r.class,
-      座號: r.seatNo,
-      身分證字號: r.idNumber,
-      國文成績: r.chinese ?? "",
-      英文成績: r.english ?? "",
-      數學成績: r.math ?? "",
-      篩選科目: SUBJECT_LABELS[r.filterSubject],
-      篩選成績: r.filterScore,
+      [t("result.exportStatus")]: r.status === "priority" ? t("result.exportPriority") : r.status === "excluded" ? t("result.exportExcluded") : t("result.exportNormal"),
+      [t("result.exportName")]: r.name,
+      [t("result.exportGrade")]: t(`grades.g${r.grade}`, { defaultValue: `${r.grade}` }),
+      [t("result.exportClass")]: r.class,
+      [t("result.exportSeat")]: r.seatNo,
+      [t("result.exportIdNumber")]: r.idNumber,
+      [t("result.exportChinese")]: r.chinese ?? "",
+      [t("result.exportEnglish")]: r.english ?? "",
+      [t("result.exportMath")]: r.math ?? "",
+      [t("result.exportFilterSubject")]: t(`subjects.${r.filterSubject}`),
+      [t("result.exportFilterScore")]: r.filterScore,
     }));
   };
 
@@ -192,46 +194,46 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
       if (r.status === "priority") entry.priority++;
     }
     return [...map.values()].sort((a, b) =>
-      a.grade !== b.grade ? a.grade - b.grade : String(a.cls).localeCompare(String(b.cls), "zh-TW")
+      a.grade !== b.grade ? a.grade - b.grade : String(a.cls).localeCompare(String(b.cls))
     );
   }, [filterResults]);
 
-  const TABLE_COLS = [
-    { key: "status", label: "狀態" },
-    { key: "name", label: "姓名" },
-    { key: "grade", label: "年級" },
-    { key: "class", label: "班級" },
-    { key: "seatNo", label: "座號" },
-    { key: "idNumber", label: "身分證字號" },
-    { key: "chinese", label: "國文" },
-    { key: "english", label: "英文" },
-    { key: "math", label: "數學" },
-    { key: "filterSubject", label: "篩選科目" },
+  const TABLE_COLS: { key: string; labelKey: string }[] = [
+    { key: "status", labelKey: "result.colStatus" },
+    { key: "name", labelKey: "result.colName" },
+    { key: "grade", labelKey: "result.colGrade" },
+    { key: "class", labelKey: "result.colClass" },
+    { key: "seatNo", labelKey: "result.colSeat" },
+    { key: "idNumber", labelKey: "result.colIdNumber" },
+    { key: "chinese", labelKey: "subjects.chinese" },
+    { key: "english", labelKey: "subjects.english" },
+    { key: "math", labelKey: "subjects.math" },
+    { key: "filterSubject", labelKey: "result.colFilterSubject" },
   ];
 
   return (
     <div className="space-y-5 print-container">
       <div className="print-header hidden">
-        <h1>成績篩選結果報表</h1>
+        <h1>{t("result.reportTitle")}</h1>
         <div className="print-date">
-          列印日期：{new Date().toLocaleDateString("zh-TW")} · 共 {priorityCount + normalCount} 人
+          {t("result.printDate")}{new Date().toLocaleDateString()} · {t("result.totalPeople", { count: priorityCount + normalCount })}
         </div>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-          <p className="text-xs text-gray-500 font-medium">篩選名單人次</p>
+          <p className="text-xs text-gray-500 font-medium">{t("result.totalLabel")}</p>
           <p className="text-2xl font-bold text-gray-900 mt-1">{priorityCount + normalCount}</p>
         </div>
         <div className="bg-white rounded-xl border border-amber-200 p-4 shadow-sm bg-amber-50/40">
-          <p className="text-xs text-amber-600 font-medium">優先（在校生）</p>
+          <p className="text-xs text-amber-600 font-medium">{t("result.priorityLabel")}</p>
           <p className="text-2xl font-bold text-amber-600 mt-1">{priorityCount}</p>
         </div>
         <div className="bg-white rounded-xl border border-blue-200 p-4 shadow-sm bg-blue-50/30">
-          <p className="text-xs text-blue-600 font-medium">一般篩選</p>
+          <p className="text-xs text-blue-600 font-medium">{t("result.normalLabel")}</p>
           <p className="text-2xl font-bold text-blue-600 mt-1">{normalCount}</p>
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm opacity-70">
-          <p className="text-xs text-gray-500 font-medium">特生（已排除）</p>
+          <p className="text-xs text-gray-500 font-medium">{t("result.excludedLabel")}</p>
           <p className="text-2xl font-bold text-gray-500 mt-1">{excludedCount}</p>
         </div>
       </div>
@@ -244,8 +246,8 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
           >
             <div className="flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-blue-600" />
-              <span className="text-sm font-semibold text-gray-800">成績統計摘要</span>
-              <span className="text-xs text-gray-400 font-normal">最高 / 最低 / 平均 / 錄取門檻</span>
+              <span className="text-sm font-semibold text-gray-800">{t("result.statsSummary")}</span>
+              <span className="text-xs text-gray-400 font-normal">{t("result.statsSubtitle")}</span>
             </div>
             {showStats
               ? <ChevronUp className="w-4 h-4 text-gray-400" />
@@ -257,14 +259,14 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50/60 border-b border-gray-100">
-                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500">年級</th>
-                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500">科目</th>
-                    <th className="px-4 py-2.5 text-right text-xs font-semibold text-gray-500">人數</th>
-                    <th className="px-4 py-2.5 text-right text-xs font-semibold text-emerald-600">最高分</th>
-                    <th className="px-4 py-2.5 text-right text-xs font-semibold text-rose-500">最低分</th>
-                    <th className="px-4 py-2.5 text-right text-xs font-semibold text-blue-600">平均分</th>
-                    <th className="px-4 py-2.5 text-right text-xs font-semibold text-amber-600">錄取門檻</th>
-                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-400 w-40">分布</th>
+                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500">{t("result.thGrade")}</th>
+                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500">{t("result.thSubject")}</th>
+                    <th className="px-4 py-2.5 text-right text-xs font-semibold text-gray-500">{t("result.thCount")}</th>
+                    <th className="px-4 py-2.5 text-right text-xs font-semibold text-emerald-600">{t("result.thMax")}</th>
+                    <th className="px-4 py-2.5 text-right text-xs font-semibold text-rose-500">{t("result.thMin")}</th>
+                    <th className="px-4 py-2.5 text-right text-xs font-semibold text-blue-600">{t("result.thAvg")}</th>
+                    <th className="px-4 py-2.5 text-right text-xs font-semibold text-amber-600">{t("result.thCutoff")}</th>
+                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-400 w-40">{t("result.thDistribution")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -286,11 +288,11 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
                     return (
                       <tr key={`${grade}-${subject}`} className="border-b border-gray-50 hover:bg-gray-50/40 transition-colors">
                         <td className="px-4 py-2.5 text-xs text-gray-600 font-medium whitespace-nowrap">
-                          {GRADE_LABELS[grade] || `${grade}年級`}
+                          {t(`grades.g${grade}`, { defaultValue: `${grade}` })}
                         </td>
                         <td className="px-4 py-2.5">
                           <span className={`text-xs font-semibold rounded-full px-2 py-0.5 ${subjectColors[subject]}`}>
-                            {SUBJECT_LABELS[subject]}
+                            {t(`subjects.${subject}`)}
                           </span>
                         </td>
                         <td className="px-4 py-2.5 text-right text-xs font-semibold text-gray-700">{count}</td>
@@ -318,14 +320,14 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
               {/* Class breakdown */}
               {classStats.length > 0 && (
                 <div className="border-t border-gray-100 px-5 py-4">
-                  <p className="text-xs font-semibold text-gray-500 mb-3">各班錄取人數</p>
+                  <p className="text-xs font-semibold text-gray-500 mb-3">{t("result.classBreakdown")}</p>
                   <div className="flex flex-wrap gap-2">
                     {classStats.map(({ grade, cls, count, priority }) => (
                       <div
                         key={`${grade}-${cls}`}
                         className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5"
                       >
-                        <span className="text-xs text-gray-500">{GRADE_LABELS[grade]?.replace("年級", "") ?? grade}年{cls}</span>
+                        <span className="text-xs text-gray-500">{grade}{t("result.yearUnit")}{cls}</span>
                         <span className="text-sm font-bold text-gray-800">{count}</span>
                         {priority > 0 && (
                           <span className="text-xs text-amber-600 font-medium">
@@ -348,13 +350,13 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {gradeStats.length > 0 && (
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">各年級人數</h3>
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">{t("result.gradeBreakdown")}</h3>
               <div className="space-y-2">
                 {gradeStats.map(({ grade, count }) => {
                   const max = Math.max(...gradeStats.map((g) => g.count));
                   return (
                     <div key={grade} className="flex items-center gap-3">
-                      <span className="text-xs text-gray-600 w-14 flex-shrink-0">{GRADE_LABELS[grade] || `${grade}年級`}</span>
+                      <span className="text-xs text-gray-600 w-14 flex-shrink-0">{t(`grades.g${grade}`, { defaultValue: `${grade}` })}</span>
                       <div className="flex-1 bg-gray-100 rounded-full h-2">
                         <div className="bg-blue-500 h-2 rounded-full transition-all" style={{ width: `${Math.round((count / max) * 100)}%` }} />
                       </div>
@@ -367,14 +369,14 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
           )}
           {subjectStats.length > 0 && (
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">各科目人數</h3>
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">{t("result.subjectBreakdown")}</h3>
               <div className="space-y-2">
                 {subjectStats.map(({ subject, count }) => {
                   const max = Math.max(...subjectStats.map((s) => s.count));
                   const colors: Record<Subject, string> = { chinese: "bg-rose-400", english: "bg-blue-400", math: "bg-emerald-400" };
                   return (
                     <div key={subject} className="flex items-center gap-3">
-                      <span className="text-xs text-gray-600 w-14 flex-shrink-0">{SUBJECT_LABELS[subject]}</span>
+                      <span className="text-xs text-gray-600 w-14 flex-shrink-0">{t(`subjects.${subject}`)}</span>
                       <div className="flex-1 bg-gray-100 rounded-full h-2">
                         <div className={`${colors[subject]} h-2 rounded-full transition-all`} style={{ width: `${Math.round((count / max) * 100)}%` }} />
                       </div>
@@ -394,7 +396,7 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
-              placeholder="搜尋姓名、身分證、班級..."
+              placeholder={t("result.searchPlaceholder")}
               className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -406,16 +408,16 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
               value={gradeFilter}
               onChange={(e) => setGradeFilter(e.target.value === "all" ? "all" : Number(e.target.value))}
             >
-              <option value="all">全部年級</option>
-              {grades.map((g) => <option key={g} value={g}>{GRADE_LABELS[g] || `${g}年級`}</option>)}
+              <option value="all">{t("result.allGrades")}</option>
+              {grades.map((g) => <option key={g} value={g}>{t(`grades.g${g}`, { defaultValue: `${g}` })}</option>)}
             </select>
             <select
               className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={subjectFilter}
               onChange={(e) => setSubjectFilter(e.target.value as Subject | "all")}
             >
-              <option value="all">全部科目</option>
-              {subjects.map((s) => <option key={s} value={s}>{SUBJECT_LABELS[s]}</option>)}
+              <option value="all">{t("result.allSubjects")}</option>
+              {subjects.map((s) => <option key={s} value={s}>{t(`subjects.${s}`)}</option>)}
             </select>
 
             <div className="flex rounded-lg border border-gray-200 overflow-hidden">
@@ -425,10 +427,10 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
                   "flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors",
                   viewMode === "list" ? "bg-blue-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"
                 )}
-                title="綜合列表"
+                title={t("result.listViewTitle")}
               >
                 <List className="w-4 h-4" />
-                列表
+                {t("result.listView")}
               </button>
               <button
                 onClick={() => setViewMode("grouped")}
@@ -436,10 +438,10 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
                   "flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors border-l border-gray-200",
                   viewMode === "grouped" ? "bg-blue-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"
                 )}
-                title="分班顯示"
+                title={t("result.groupedViewTitle")}
               >
                 <LayoutList className="w-4 h-4" />
-                分班
+                {t("result.groupedView")}
               </button>
             </div>
 
@@ -453,12 +455,12 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
               )}
             >
               <UserX className="w-4 h-4" />
-              {showExcluded ? "隱藏特生" : "顯示特生"}
+              {showExcluded ? t("result.hideExcluded") : t("result.showExcluded")}
             </button>
             <button
               onClick={handleExport}
               className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
-              title="匯出 Excel (Ctrl+E)"
+              title={`${t("actions.exportExcel")} (Ctrl+E)`}
             >
               <FileSpreadsheet className="w-4 h-4" />
               <span className="hidden sm:inline">Excel</span>
@@ -466,9 +468,9 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
             <button
               onClick={() => {
                 try {
-                  exportToCsv(exportData(true), "篩選結果.csv");
-                  toast.success("已匯出 CSV");
-                } catch { toast.error("匯出失敗"); }
+                  exportToCsv(exportData(true), t("result.csvFilename"));
+                  toast.success(t("result.csvExported"));
+                } catch { toast.error(t("result.exportFailed")); }
               }}
               className="flex items-center gap-1.5 px-3 py-2 bg-gray-600 text-white text-sm font-medium rounded-lg hover:bg-gray-700 transition-colors"
             >
@@ -478,18 +480,18 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
             <button
               onClick={handlePrint}
               className="flex items-center gap-1.5 px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors no-print"
-              title="列印 (Ctrl+P)"
+              title={`${t("actions.print")} (Ctrl+P)`}
             >
               <Printer className="w-4 h-4" />
-              <span className="hidden sm:inline">列印</span>
+              <span className="hidden sm:inline">{t("actions.print")}</span>
             </button>
             <button
               onClick={() => setSnapshotOpen(true)}
               className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:border-indigo-400 hover:text-indigo-600 transition-colors no-print"
-              title="快照與比較"
+              title={t("result.snapshotTitle")}
             >
               <Camera className="w-4 h-4" />
-              <span className="hidden sm:inline">快照</span>
+              <span className="hidden sm:inline">{t("actions.snapshot")}</span>
             </button>
           </div>
         </div>
@@ -511,7 +513,7 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
                 {filtered.length === 0 ? (
                   <div className="px-4 py-12 text-center text-gray-400">
                     <Users className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                    <p>沒有符合條件的資料</p>
+                    <p>{t("result.noMatchingData")}</p>
                   </div>
                 ) : (
                   filtered.map((r) => <ResultCard key={r.id} r={r} />)
@@ -522,13 +524,13 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-100 bg-gray-50/30">
-                      {TABLE_COLS.map(({ key, label }) => (
+                      {TABLE_COLS.map(({ key, labelKey }) => (
                         <th
                           key={key}
                           className="px-4 py-3 text-left text-xs font-semibold text-gray-600 cursor-pointer select-none whitespace-nowrap"
                           onClick={() => toggleSort(key as SortKey)}
                         >
-                          <span className="flex items-center gap-1">{label}<SortIcon k={key as SortKey} /></span>
+                          <span className="flex items-center gap-1">{t(labelKey)}<SortIcon k={key as SortKey} /></span>
                         </th>
                       ))}
                     </tr>
@@ -538,7 +540,7 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
                       <tr>
                         <td colSpan={10} className="px-4 py-12 text-center text-gray-400">
                           <Users className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                          <p>沒有符合條件的資料</p>
+                          <p>{t("result.noMatchingData")}</p>
                         </td>
                       </tr>
                     ) : (
@@ -549,10 +551,13 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
               </div>
             )}
             <div className="px-5 py-3 border-t border-gray-100 text-xs text-gray-500 bg-gray-50/30 flex items-center justify-between gap-2">
-              <span>顯示 {filtered.length} 筆{excludedCount > 0 && !showExcluded && `（另有 ${excludedCount} 名特生已隱藏）`}</span>
+              <span>
+                {t("result.showingCount", { count: filtered.length })}
+                {excludedCount > 0 && !showExcluded && ` (${t("result.hiddenExcluded", { count: excludedCount })})`}
+              </span>
               {filtered.length >= VIRTUAL_THRESHOLD && (
                 <span className="text-[10px] text-blue-600 bg-blue-50 border border-blue-100 rounded-full px-2 py-0.5">
-                  已啟用虛擬捲動
+                  {t("status.virtualized")}
                 </span>
               )}
             </div>
@@ -568,14 +573,14 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
           className="flex items-center gap-2 px-5 py-2.5 border border-gray-300 text-gray-700 rounded-lg font-medium text-sm hover:bg-gray-50 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          修改篩選條件
+          {t("result.editFilter")}
         </button>
         <button
           onClick={onReset}
           className="flex items-center gap-2 px-5 py-2.5 border border-red-200 text-red-600 rounded-lg font-medium text-sm hover:bg-red-50 transition-colors"
         >
           <RefreshCw className="w-4 h-4" />
-          重新開始
+          {t("result.restart")}
         </button>
       </div>
 
@@ -590,6 +595,7 @@ export default function ResultPage({ onPrev, onReset }: { onPrev: () => void; on
 }
 
 function ResultRow({ r }: { r: FilterResult }) {
+  const { t } = useTranslation();
   return (
     <tr
       className={cn(
@@ -602,18 +608,18 @@ function ResultRow({ r }: { r: FilterResult }) {
       <td className="px-4 py-3">
         {r.status === "priority" ? (
           <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-100 rounded-full px-2.5 py-1">
-            <Star className="w-3 h-3 fill-amber-500 text-amber-500" />優先
+            <Star className="w-3 h-3 fill-amber-500 text-amber-500" />{t("status.priority")}
           </span>
         ) : r.status === "excluded" ? (
           <span className="inline-flex items-center gap-1 text-xs font-semibold text-gray-500 bg-gray-100 rounded-full px-2.5 py-1">
-            <UserX className="w-3 h-3" />已排除
+            <UserX className="w-3 h-3" />{t("result.excluded")}
           </span>
         ) : (
-          <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 bg-blue-50 rounded-full px-2.5 py-1">一般</span>
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 bg-blue-50 rounded-full px-2.5 py-1">{t("status.normal")}</span>
         )}
       </td>
       <td className={cn("px-4 py-3 font-medium", r.status === "excluded" ? "text-gray-400" : "text-gray-900")}>{r.name || "—"}</td>
-      <td className="px-4 py-3 text-gray-500 text-xs">{r.grade ? (GRADE_LABELS[r.grade] || `${r.grade}年級`) : "—"}</td>
+      <td className="px-4 py-3 text-gray-500 text-xs">{r.grade ? t(`grades.g${r.grade}`, { defaultValue: `${r.grade}` }) : "—"}</td>
       <td className="px-4 py-3 text-gray-500 text-xs">{r.class || "—"}</td>
       <td className="px-4 py-3 text-gray-500 text-xs">{r.seatNo || "—"}</td>
       <td className={cn("px-4 py-3 font-mono text-xs", r.status === "excluded" ? "text-gray-400" : "text-gray-700")}>{r.idNumber}</td>
@@ -621,7 +627,7 @@ function ResultRow({ r }: { r: FilterResult }) {
       <td className="px-4 py-3 text-center"><ScoreCell value={r.english} isFilter={r.filterSubject === "english"} isExcluded={r.status === "excluded"} /></td>
       <td className="px-4 py-3 text-center"><ScoreCell value={r.math} isFilter={r.filterSubject === "math"} isExcluded={r.status === "excluded"} /></td>
       <td className="px-4 py-3">
-        <span className="text-xs font-medium text-gray-600 bg-gray-100 rounded-full px-2.5 py-1">{SUBJECT_LABELS[r.filterSubject]}</span>
+        <span className="text-xs font-medium text-gray-600 bg-gray-100 rounded-full px-2.5 py-1">{t(`subjects.${r.filterSubject}`)}</span>
       </td>
     </tr>
   );
@@ -635,6 +641,7 @@ function GroupedView({
   excludedCount: number;
   totalShown: number;
 }) {
+  const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   const toggle = (key: string) => {
@@ -649,7 +656,7 @@ function GroupedView({
     return (
       <div className="px-4 py-12 text-center text-gray-400">
         <Users className="w-10 h-10 mx-auto mb-2 opacity-30" />
-        <p>沒有符合條件的資料</p>
+        <p>{t("result.noMatchingData")}</p>
       </div>
     );
   }
@@ -672,19 +679,19 @@ function GroupedView({
               >
                 <div className="flex items-center gap-3">
                   <span className="font-semibold text-gray-800 text-sm">
-                    {first.grade ? (GRADE_LABELS[first.grade] || `${first.grade}年級`) : "未知年級"} · {first.class || "未知班級"}
+                    {first.grade ? t(`grades.g${first.grade}`, { defaultValue: `${first.grade}` }) : t("result.unknownGrade")} · {first.class || t("result.unknownClass")}
                   </span>
                   <span className="text-xs text-gray-500 bg-white border border-gray-200 rounded-full px-2.5 py-0.5">
-                    {activeCount} 人
+                    {activeCount} {t("result.personUnit")}
                   </span>
                   {priorityCount > 0 && (
                     <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-0.5">
-                      優先 {priorityCount}
+                      {t("status.priority")} {priorityCount}
                     </span>
                   )}
                   {excludedInGroup > 0 && showExcluded && (
                     <span className="text-xs text-gray-400 bg-gray-50 border border-gray-200 rounded-full px-2.5 py-0.5">
-                      特生 {excludedInGroup}
+                      {t("result.specialStudent")} {excludedInGroup}
                     </span>
                   )}
                 </div>
@@ -696,14 +703,14 @@ function GroupedView({
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-gray-100">
-                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">狀態</th>
-                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">座號</th>
-                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">姓名</th>
-                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">身分證字號</th>
-                        <th className="px-4 py-2 text-center text-xs font-semibold text-gray-500">國文</th>
-                        <th className="px-4 py-2 text-center text-xs font-semibold text-gray-500">英文</th>
-                        <th className="px-4 py-2 text-center text-xs font-semibold text-gray-500">數學</th>
-                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">篩選科目</th>
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">{t("result.colStatus")}</th>
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">{t("result.colSeat")}</th>
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">{t("result.colName")}</th>
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">{t("result.colIdNumber")}</th>
+                        <th className="px-4 py-2 text-center text-xs font-semibold text-gray-500">{t("subjects.chinese")}</th>
+                        <th className="px-4 py-2 text-center text-xs font-semibold text-gray-500">{t("subjects.english")}</th>
+                        <th className="px-4 py-2 text-center text-xs font-semibold text-gray-500">{t("subjects.math")}</th>
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">{t("result.colFilterSubject")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -720,12 +727,12 @@ function GroupedView({
                           <td className="px-4 py-2">
                             {r.status === "priority" ? (
                               <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-100 rounded-full px-2 py-0.5">
-                                <Star className="w-2.5 h-2.5 fill-amber-500 text-amber-500" />優先
+                                <Star className="w-2.5 h-2.5 fill-amber-500 text-amber-500" />{t("status.priority")}
                               </span>
                             ) : r.status === "excluded" ? (
-                              <span className="text-xs text-gray-400">特生</span>
+                              <span className="text-xs text-gray-400">{t("result.specialStudent")}</span>
                             ) : (
-                              <span className="text-xs text-blue-600 font-medium">一般</span>
+                              <span className="text-xs text-blue-600 font-medium">{t("status.normal")}</span>
                             )}
                           </td>
                           <td className="px-4 py-2 text-xs text-gray-500">{r.seatNo}</td>
@@ -735,7 +742,7 @@ function GroupedView({
                           <td className="px-4 py-2 text-center"><ScoreCell value={r.english} isFilter={r.filterSubject === "english"} isExcluded={r.status === "excluded"} /></td>
                           <td className="px-4 py-2 text-center"><ScoreCell value={r.math} isFilter={r.filterSubject === "math"} isExcluded={r.status === "excluded"} /></td>
                           <td className="px-4 py-2">
-                            <span className="text-xs font-medium text-gray-600 bg-gray-100 rounded-full px-2 py-0.5">{SUBJECT_LABELS[r.filterSubject]}</span>
+                            <span className="text-xs font-medium text-gray-600 bg-gray-100 rounded-full px-2 py-0.5">{t(`subjects.${r.filterSubject}`)}</span>
                           </td>
                         </tr>
                       ))}
@@ -748,8 +755,8 @@ function GroupedView({
         })}
       </div>
       <div className="px-5 py-3 border-t border-gray-100 text-xs text-gray-500 bg-gray-50/30">
-        共 {groupedData.size} 個班級，顯示 {totalShown} 筆
-        {excludedCount > 0 && !showExcluded && `（另有 ${excludedCount} 名特生已隱藏）`}
+        {t("result.groupedFooter", { classes: groupedData.size, count: totalShown })}
+        {excludedCount > 0 && !showExcluded && ` (${t("result.hiddenExcluded", { count: excludedCount })})`}
       </div>
     </>
   );
@@ -766,18 +773,19 @@ function ScoreCell({ value, isFilter, isExcluded }: { value?: number; isFilter: 
 
 /** P2.3 行動裝置用卡片（取代表格）*/
 function ResultCard({ r }: { r: FilterResult }) {
+  const { t } = useTranslation();
   const subjects: Subject[] = ["chinese", "english", "math"];
   const statusBadge =
     r.status === "priority" ? (
       <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-100 rounded-full px-2 py-0.5">
-        <Star className="w-3 h-3 fill-amber-500 text-amber-500" />優先
+        <Star className="w-3 h-3 fill-amber-500 text-amber-500" />{t("status.priority")}
       </span>
     ) : r.status === "excluded" ? (
       <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-gray-500 bg-gray-100 rounded-full px-2 py-0.5">
-        <UserX className="w-3 h-3" />已排除
+        <UserX className="w-3 h-3" />{t("result.excluded")}
       </span>
     ) : (
-      <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 rounded-full px-2 py-0.5">一般</span>
+      <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 rounded-full px-2 py-0.5">{t("status.normal")}</span>
     );
 
   return (
@@ -798,14 +806,14 @@ function ResultCard({ r }: { r: FilterResult }) {
             {statusBadge}
           </div>
           <p className="text-xs text-gray-500">
-            {r.grade ? (GRADE_LABELS[r.grade] || `${r.grade}年級`) : "—"}
-            {r.class && <> · {r.class}班</>}
-            {r.seatNo && <> · {r.seatNo}號</>}
+            {r.grade ? t(`grades.g${r.grade}`, { defaultValue: `${r.grade}` }) : "—"}
+            {r.class && <> · {r.class}{t("result.classUnit")}</>}
+            {r.seatNo && <> · {r.seatNo}{t("result.seatUnit")}</>}
           </p>
           <p className="text-[11px] font-mono text-gray-400 mt-0.5 truncate">{r.idNumber}</p>
         </div>
         <span className="text-[11px] font-medium text-gray-600 bg-gray-100 rounded-full px-2 py-0.5 flex-shrink-0">
-          {SUBJECT_LABELS[r.filterSubject]}
+          {t(`subjects.${r.filterSubject}`)}
         </span>
       </div>
       <div className="grid grid-cols-3 gap-2 mt-2">
@@ -822,7 +830,7 @@ function ResultCard({ r }: { r: FilterResult }) {
                   : "bg-gray-50/60 border-gray-100"
               )}
             >
-              <p className="text-[10px] text-gray-500">{SUBJECT_LABELS[sub]}</p>
+              <p className="text-[10px] text-gray-500">{t(`subjects.${sub}`)}</p>
               <p className={cn(
                 "text-sm font-bold",
                 r.status === "excluded" ? "text-gray-400"

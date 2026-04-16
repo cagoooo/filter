@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useDataContext, useFilterContext } from "../context/AppContext";
-import { FilterConfig, FilterDirection, Subject, SUBJECT_LABELS, GRADE_LABELS } from "../types";
+import { FilterConfig, FilterDirection, Subject } from "../types";
 import { Plus, Trash2, ArrowLeft, Play, Settings2, ChevronDown, ChevronUp, Layers, AlertTriangle, FolderOpen, Undo2, Redo2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -43,6 +44,7 @@ function detectCrossSubjectMismatches(
 }
 
 export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onNext: () => void }) {
+  const { t } = useTranslation();
   const { filterConfigs, setFilterConfigs, runFilter } = useFilterContext();
   const { chineseData, englishData, mathData } = useDataContext();
 
@@ -68,9 +70,9 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
 
   const idMismatches = useMemo(() => {
     const datasets = [
-      { label: "國文成績", data: chineseData },
-      { label: "英文成績", data: englishData },
-      { label: "數學成績", data: mathData },
+      { label: t("import.chineseTitle"), data: chineseData },
+      { label: t("import.englishTitle"), data: englishData },
+      { label: t("import.mathTitle"), data: mathData },
     ].filter((d) => d.data.length > 0);
     if (datasets.length < 2) return [];
     return detectCrossSubjectMismatches(datasets);
@@ -90,13 +92,13 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
     onUndo: () => {
       if (canUndo) {
         undoConfigs();
-        toast("已撤銷上一步", { duration: 1500 });
+        toast(t("filter.undone"), { duration: 1500 });
       }
     },
     onRedo: () => {
       if (canRedo) {
         redoConfigs();
-        toast("已還原", { duration: 1500 });
+        toast(t("filter.redone"), { duration: 1500 });
       }
     },
   });
@@ -160,12 +162,12 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
 
   const handleRun = () => {
     if (configs.length === 0) {
-      toast.error("請先新增篩選條件");
+      toast.error(t("filter.addConfigFirst"));
       return;
     }
     setFilterConfigs(configs);
     runFilter(configs);
-    toast.success(`已執行篩選（${configs.length} 筆條件）`);
+    toast.success(t("filter.filterExecuted", { count: configs.length }));
     onNext();
   };
 
@@ -180,8 +182,8 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
 
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-bold text-gray-900">設定篩選條件</h2>
-          <p className="text-xs text-gray-500 mt-0.5">設定各年級、各科的篩選規則</p>
+          <h2 className="text-lg font-bold text-gray-900">{t("filter.title")}</h2>
+          <p className="text-xs text-gray-500 mt-0.5">{t("filter.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex rounded-lg overflow-hidden border border-gray-300 bg-white">
@@ -189,7 +191,7 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
               onClick={undoConfigs}
               disabled={!canUndo}
               className="flex items-center gap-1 px-2.5 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              title="撤銷 (Ctrl/⌘+Z)"
+              title={t("filter.undoTitle")}
             >
               <Undo2 className="w-4 h-4" />
             </button>
@@ -197,7 +199,7 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
               onClick={redoConfigs}
               disabled={!canRedo}
               className="flex items-center gap-1 px-2.5 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors border-l border-gray-300"
-              title="還原 (Ctrl/⌘+Shift+Z)"
+              title={t("filter.redoTitle")}
             >
               <Redo2 className="w-4 h-4" />
             </button>
@@ -205,10 +207,10 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
           <button
             onClick={() => setTemplateDialogOpen(true)}
             className="flex items-center gap-1.5 px-3 py-2 text-sm bg-white border border-gray-300 text-gray-700 rounded-lg hover:border-blue-400 hover:text-blue-600 transition-colors"
-            title="管理篩選條件範本"
+            title={t("filter.manageTemplates")}
           >
             <FolderOpen className="w-4 h-4" />
-            範本
+            {t("filter.template")}
           </button>
         </div>
       </div>
@@ -228,14 +230,14 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
           >
             <span className="flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-red-600" />
-              跨科目身分證不一致：發現 {idMismatches.length} 位學生在不同科目中的身分證字號不同，可能資料有誤
+              {t("filter.idMismatchWarning", { count: idMismatches.length })}
             </span>
             {mismatchExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
           {mismatchExpanded && (
             <div className="px-4 pb-4 space-y-3">
               <p className="text-xs text-red-600 italic">
-                以下學生的姓名在多個科目成績中出現，但身分證字號不同。請回到上一步確認原始 Excel 資料是否正確。
+                {t("filter.idMismatchHint")}
               </p>
               <div className="space-y-2">
                 {idMismatches.map((m, i) => (
@@ -260,14 +262,14 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
         <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Settings2 className="w-5 h-5 text-blue-600" />
-            <h2 className="font-semibold text-gray-900">篩選條件設定</h2>
+            <h2 className="font-semibold text-gray-900">{t("filter.configTitle")}</h2>
           </div>
           <button
             onClick={addConfig}
             className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
           >
             <Plus className="w-4 h-4" />
-            新增條件
+            {t("filter.addCondition")}
           </button>
         </div>
 
@@ -279,7 +281,7 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
             >
               <span className="flex items-center gap-2">
                 <Layers className="w-4 h-4" />
-                批次新增：一次對多個年級套用相同條件
+                {t("filter.batchTitle")}
               </span>
               {batchExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </button>
@@ -288,7 +290,7 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
               <div className="px-4 pb-4 pt-3 bg-white border-t border-indigo-100 space-y-3">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">科目</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">{t("filter.subject")}</label>
                     <select
                       className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       value={batchSubject}
@@ -296,13 +298,13 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
                     >
                       {SUBJECTS.map((s) => (
                         <option key={s} value={s} disabled={subjectCounts[s] === 0}>
-                          {SUBJECT_LABELS[s]}{subjectCounts[s] === 0 ? "（未匯入）" : ""}
+                          {t(`subjects.${s}`)}{subjectCounts[s] === 0 ? t("filter.notImported") : ""}
                         </option>
                       ))}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">篩選方式</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">{t("filter.method")}</label>
                     <div className="flex rounded-lg border border-gray-200 overflow-hidden">
                       {(["percent", "count"] as const).map((m) => (
                         <button
@@ -314,14 +316,14 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
                           )}
                           onClick={() => setBatchMode(m)}
                         >
-                          {m === "percent" ? "百分比" : "固定人數"}
+                          {m === "percent" ? t("filter.percent") : t("filter.fixedCount")}
                         </button>
                       ))}
                     </div>
                   </div>
                   <div>
                     <label className="flex items-center gap-1 text-xs font-medium text-gray-600 mb-1">
-                      取
+                      {t("filter.select")}
                       <button
                         type="button"
                         onClick={() => setBatchDirection((d) => d === "top" ? "bottom" : "top")}
@@ -332,9 +334,8 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
                             : "bg-blue-100 text-blue-700 border-blue-200"
                         )}
                       >
-                        {batchDirection === "bottom" ? "後" : "前"}
+                        {batchDirection === "bottom" ? t("filter.bottom") : t("filter.top")}
                       </button>
-                      <span>幾{batchMode === "percent" ? "" : "名"}</span>
                     </label>
                     <div className="flex items-center gap-2">
                       <input
@@ -346,14 +347,14 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
                         onChange={(e) => setBatchValue(Math.max(1, Number(e.target.value)))}
                       />
                       <span className="text-sm text-gray-500 flex-shrink-0">
-                        {batchMode === "percent" ? "%" : "名"}
+                        {batchMode === "percent" ? t("filter.percentUnit") : t("filter.personUnit")}
                       </span>
                     </div>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-2">套用至年級</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-2">{t("filter.applyToGrades")}</label>
                   <div className="flex flex-wrap gap-2">
                     {GRADES.map((g) => (
                       <button
@@ -366,20 +367,20 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
                             : "bg-white text-gray-600 border-gray-200 hover:border-indigo-300"
                         )}
                       >
-                        {GRADE_LABELS[g]}
+                        {t(`grades.g${g}`)}
                       </button>
                     ))}
                     <button
                       onClick={() => setBatchGrades(new Set(GRADES))}
                       className="px-3 py-1.5 text-sm rounded-lg border font-medium text-gray-500 border-gray-200 hover:border-gray-300 transition-colors"
                     >
-                      全選
+                      {t("filter.selectAll")}
                     </button>
                     <button
                       onClick={() => setBatchGrades(new Set())}
                       className="px-3 py-1.5 text-sm rounded-lg border font-medium text-gray-500 border-gray-200 hover:border-gray-300 transition-colors"
                     >
-                      全消
+                      {t("filter.deselectAll")}
                     </button>
                   </div>
                 </div>
@@ -391,14 +392,14 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
                     className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
                   >
                     <Plus className="w-4 h-4" />
-                    新增（跳過已有的條件）
+                    {t("filter.batchAdd")}
                   </button>
                   <button
                     onClick={handleBatchOverwrite}
                     disabled={batchGrades.size === 0}
                     className="flex items-center gap-1.5 px-4 py-2 border border-indigo-300 text-indigo-700 text-sm font-medium rounded-lg hover:bg-indigo-50 disabled:opacity-50 transition-colors"
                   >
-                    覆蓋同年級同科目的條件
+                    {t("filter.batchOverwrite")}
                   </button>
                 </div>
               </div>
@@ -419,20 +420,20 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
                   </div>
                   <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">年級</label>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">{t("filter.gradeLabel")}</label>
                       <select
                         className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         value={cfg.grade}
                         onChange={(e) => updateConfig(i, { grade: Number(e.target.value) })}
                       >
                         {GRADES.map((g) => (
-                          <option key={g} value={g}>{GRADE_LABELS[g]}</option>
+                          <option key={g} value={g}>{t(`grades.g${g}`)}</option>
                         ))}
                       </select>
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">科目</label>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">{t("filter.subjectLabel")}</label>
                       <select
                         className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         value={cfg.subject}
@@ -440,14 +441,14 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
                       >
                         {SUBJECTS.map((s) => (
                           <option key={s} value={s} disabled={subjectCounts[s] === 0}>
-                            {SUBJECT_LABELS[s]}{subjectCounts[s] === 0 ? "（未匯入）" : ""}
+                            {t(`subjects.${s}`)}{subjectCounts[s] === 0 ? t("filter.notImported") : ""}
                           </option>
                         ))}
                       </select>
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">篩選方式</label>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">{t("filter.methodLabel")}</label>
                       <div className="flex rounded-lg border border-gray-200 overflow-hidden">
                         <button
                           className={cn(
@@ -456,7 +457,7 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
                           )}
                           onClick={() => updateConfig(i, { mode: "percent" })}
                         >
-                          百分比
+                          {t("filter.percent")}
                         </button>
                         <button
                           className={cn(
@@ -465,14 +466,14 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
                           )}
                           onClick={() => updateConfig(i, { mode: "count" })}
                         >
-                          固定人數
+                          {t("filter.fixedCount")}
                         </button>
                       </div>
                     </div>
 
                     <div>
                       <label className="flex items-center gap-1 text-xs font-medium text-gray-600 mb-1">
-                        取
+                        {t("filter.select")}
                         <button
                           type="button"
                           onClick={() => updateConfig(i, { direction: cfg.direction === "bottom" ? "top" : "bottom" })}
@@ -483,9 +484,8 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
                               : "bg-blue-100 text-blue-700 border-blue-200"
                           )}
                         >
-                          {cfg.direction === "bottom" ? "後" : "前"}
+                          {cfg.direction === "bottom" ? t("filter.bottom") : t("filter.top")}
                         </button>
-                        <span>幾{cfg.mode === "percent" ? "" : "名"}</span>
                       </label>
                       <div className="flex items-center gap-2">
                         <input
@@ -497,7 +497,7 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
                           onChange={(e) => updateConfig(i, { value: Math.max(1, Number(e.target.value)) })}
                         />
                         <span className="text-sm text-gray-500 flex-shrink-0">
-                          {cfg.mode === "percent" ? "%" : "名"}
+                          {cfg.mode === "percent" ? t("filter.percentUnit") : t("filter.personUnit")}
                         </span>
                       </div>
                     </div>
@@ -516,17 +516,17 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
                 <div className="mt-3 ml-10 flex items-center gap-2">
                   {!hasData ? (
                     <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-0.5">
-                      ⚠ {SUBJECT_LABELS[cfg.subject]}成績尚未匯入
+                      ⚠ {t(`subjects.${cfg.subject}`)} {t("filter.notYetImported")}
                     </span>
                   ) : gradeCount === 0 ? (
                     <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-0.5">
-                      ⚠ {GRADE_LABELS[cfg.grade]}無{SUBJECT_LABELS[cfg.subject]}成績資料
+                      ⚠ {t("filter.noGradeData", { grade: t(`grades.g${cfg.grade}`), subject: t(`subjects.${cfg.subject}`) })}
                     </span>
                   ) : (
                     <span className="text-xs text-gray-500">
-                      {GRADE_LABELS[cfg.grade]}{SUBJECT_LABELS[cfg.subject]}共 {gradeCount} 人 →
+                      {t(`grades.g${cfg.grade}`)} {t(`subjects.${cfg.subject}`)}{" · "}
                       <span className={cn("font-semibold ml-1", cfg.direction === "bottom" ? "text-orange-600" : "text-blue-600")}>
-                        篩出約 {count} 人{cfg.direction === "bottom" ? "（低分學習扶助）" : ""}
+                        {t("filter.estimateResult", { total: gradeCount, selected: count })}{cfg.direction === "bottom" ? t("filter.bottomHint") : ""}
                       </span>
                     </span>
                   )}
@@ -540,7 +540,7 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
             className="w-full py-3 border-2 border-dashed border-gray-200 rounded-lg text-sm text-gray-500 hover:border-blue-300 hover:text-blue-500 transition-colors flex items-center justify-center gap-2"
           >
             <Plus className="w-4 h-4" />
-            新增篩選條件
+            {t("filter.addCondition")}
           </button>
         </div>
       </div>
@@ -552,7 +552,7 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
           className="flex items-center gap-2 px-5 py-2.5 border border-gray-300 text-gray-700 rounded-lg font-medium text-sm hover:bg-gray-50 transition-colors flex-shrink-0"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span className="hidden xs:inline sm:inline">上一步</span>
+          <span className="hidden xs:inline sm:inline">{t("actions.prev")}</span>
         </button>
 
         <button
@@ -561,7 +561,7 @@ export default function FilterPage({ onPrev, onNext }: { onPrev: () => void; onN
           className="flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-1 sm:flex-none"
         >
           <Play className="w-4 h-4" />
-          執行篩選
+          {t("actions.run")}
         </button>
       </div>
     </div>

@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { FilterResult, Subject, SUBJECT_LABELS, GRADE_LABELS } from "../types";
+import { useTranslation } from "react-i18next";
+import { FilterResult, Subject } from "../types";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell,
   PieChart, Pie, Legend,
@@ -22,6 +23,7 @@ interface ScoreDistributionChartProps {
 }
 
 export default function ScoreDistributionChart({ results }: ScoreDistributionChartProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(true);
 
   const activeResults = useMemo(
@@ -63,14 +65,14 @@ export default function ScoreDistributionChart({ results }: ScoreDistributionCha
   const classPie = useMemo(() => {
     const map = new Map<string, number>();
     for (const r of activeResults) {
-      const key = `${r.grade ? GRADE_LABELS[r.grade] || `${r.grade}年級` : "未知"}${r.class || "—"}`;
+      const key = `${r.grade ? t(`grades.g${r.grade}`, { defaultValue: `${r.grade}` }) : t("chart.unknown")}${r.class || "—"}`;
       map.set(key, (map.get(key) || 0) + 1);
     }
     return [...map.entries()]
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 10);
-  }, [activeResults]);
+  }, [activeResults, t]);
 
   if (activeResults.length === 0) return null;
 
@@ -82,8 +84,8 @@ export default function ScoreDistributionChart({ results }: ScoreDistributionCha
       >
         <div className="flex items-center gap-2">
           <BarChart3 className="w-4 h-4 text-indigo-600" />
-          <span className="text-sm font-semibold text-gray-800">成績分布圖表</span>
-          <span className="text-xs text-gray-400 font-normal">分數分布直方圖 · 各班占比</span>
+          <span className="text-sm font-semibold text-gray-800">{t("chart.title")}</span>
+          <span className="text-xs text-gray-400 font-normal">{t("chart.subtitle")}</span>
         </div>
         {open ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
       </button>
@@ -92,7 +94,7 @@ export default function ScoreDistributionChart({ results }: ScoreDistributionCha
         <div className="border-t border-gray-100 p-5 space-y-6">
           {/* 分數分布直方圖 */}
           <div>
-            <h3 className="text-xs font-semibold text-gray-600 mb-3">分數分布（每 10 分一區間）</h3>
+            <h3 className="text-xs font-semibold text-gray-600 mb-3">{t("chart.histogramTitle")}</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {subjectHistograms.map(({ subject, data, total }) => (
                 <div key={subject} className="bg-gray-50/60 rounded-lg p-3">
@@ -101,9 +103,9 @@ export default function ScoreDistributionChart({ results }: ScoreDistributionCha
                       className="text-xs font-semibold rounded-full px-2.5 py-0.5"
                       style={{ backgroundColor: `${SUBJECT_COLORS[subject]}15`, color: SUBJECT_COLORS[subject] }}
                     >
-                      {SUBJECT_LABELS[subject]}
+                      {t(`subjects.${subject}`)}
                     </span>
-                    <span className="text-xs text-gray-500">共 {total} 人</span>
+                    <span className="text-xs text-gray-500">{t("chart.totalPeople", { count: total })}</span>
                   </div>
                   <ResponsiveContainer width="100%" height={140}>
                     <BarChart data={data}>
@@ -112,7 +114,7 @@ export default function ScoreDistributionChart({ results }: ScoreDistributionCha
                       <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
                       <Tooltip
                         contentStyle={{ fontSize: 12, borderRadius: 6 }}
-                        formatter={(v: number) => [`${v} 人`, "人數"]}
+                        formatter={(v: number) => [`${v}`, t("chart.personCount")]}
                       />
                       <Bar dataKey="count" fill={SUBJECT_COLORS[subject]} radius={[4, 4, 0, 0]} />
                     </BarChart>
@@ -127,7 +129,7 @@ export default function ScoreDistributionChart({ results }: ScoreDistributionCha
             <div>
               <h3 className="text-xs font-semibold text-gray-600 mb-3 flex items-center gap-1.5">
                 <PieIcon className="w-3.5 h-3.5 text-purple-500" />
-                各班錄取人數占比（前 10 大）
+                {t("chart.classPieTitle")}
               </h3>
               <div className="bg-gray-50/60 rounded-lg p-3">
                 <ResponsiveContainer width="100%" height={260}>
@@ -149,7 +151,7 @@ export default function ScoreDistributionChart({ results }: ScoreDistributionCha
                     </Pie>
                     <Tooltip
                       contentStyle={{ fontSize: 12, borderRadius: 6 }}
-                      formatter={(v: number) => [`${v} 人`, "人數"]}
+                      formatter={(v: number) => [`${v}`, t("chart.personCount")]}
                     />
                     <Legend wrapperStyle={{ fontSize: 11 }} />
                   </PieChart>
