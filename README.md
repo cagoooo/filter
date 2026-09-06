@@ -1,5 +1,7 @@
 # filter
 
+🌐 **線上使用：[國小期中考成績篩選工具](https://cagoooo.github.io/filter/)**
+
 成績篩選系統
 
 <!-- BEGIN:PROJECT_GUIDE -->
@@ -11,7 +13,7 @@
 - Repository：`cagoooo/filter`
 - 可見性：公開
 - 主要技術：TypeScript
-- 線上入口：未在 GitHub repository metadata 設定
+- 線上入口：<https://cagoooo.github.io/filter/>
 
 ### 可以怎麼應用
 
