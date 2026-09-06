@@ -2,6 +2,8 @@
 
 🌐 **線上使用：[國小期中考成績篩選工具](https://cagoooo.github.io/filter/)**
 
+> 📌 **目前版本：v1.1.2**（依據 `package.json`）
+
 成績篩選系統
 
 <!-- BEGIN:PROJECT_GUIDE -->
