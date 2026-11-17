@@ -16,6 +16,7 @@ import { useDocumentTitle } from "./hooks/use-document-title";
 import { AppBootSkeleton } from "./components/Skeleton";
 import { PWAUpdatePrompt } from "./components/PWAUpdatePrompt";
 import { LanguageSwitcher } from "./components/LanguageSwitcher";
+import { SiteFooter } from "./components/SiteFooter";
 
 const STEP_PATHS = ["/", "/filter", "/result"];
 
@@ -142,6 +143,8 @@ function AppContent() {
           </Switch>
         </ErrorBoundary>
       </main>
+
+      <SiteFooter />
 
       <ShortcutHelpDialog open={shortcutHelpOpen} onClose={() => setShortcutHelpOpen(false)} />
       <Toaster position="top-right" richColors closeButton />

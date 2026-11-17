@@ -1,4 +1,12 @@
 {
+  "footer": {
+    "point1Title": "智慧匯入",
+    "point1Desc": "分科上傳 Excel，自動辨識欄位",
+    "point2Title": "彈性篩選",
+    "point2Desc": "百分比或固定人數，自動標示優先名單",
+    "point3Title": "資料留在本機",
+    "point3Desc": "存在這台電腦的瀏覽器，可離線使用"
+  },
   "app": {
     "title": "成績篩選系統",
     "subtitle": "國小期中考成績篩選工具"

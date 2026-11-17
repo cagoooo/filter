@@ -1,4 +1,12 @@
 {
+  "footer": {
+    "point1Title": "Smart Import",
+    "point1Desc": "Upload Excel by subject; columns detected automatically",
+    "point2Title": "Flexible Filters",
+    "point2Desc": "By percentage or fixed count, priority list marked",
+    "point3Title": "Data Stays Local",
+    "point3Desc": "Saved in this browser only; works offline"
+  },
   "app": {
     "title": "Grade Filter",
     "subtitle": "Elementary school exam score filtering tool"
